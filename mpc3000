@@ -8,7 +8,7 @@ import java.nio.file.StandardOpenOption;
 interface Boundary {
 
     String NAME = MethodHandles.lookup().lookupClass().getEnclosingClass().getName();
-    String VERSION = "2026-11-02.1";
+    String VERSION = "2026-11-02.3";
 
     record Invocation(String command, List<String> parameters) {
 
@@ -26,28 +26,67 @@ interface Boundary {
             case "-help" -> usage();
             case "-version" -> {}
             case "list" -> list(invocation.parameters());
+            case "extract" -> extract(invocation.parameters());
             default -> fail("unknown command: " + invocation.command());
         }
     }
 
     static void usage() {
         IO.println("""
-                Usage: %s <command> <image>
-                  list <image>  List partitions and files of an MPC3000 disk image
-                  -help         Show this help
-                  -version      Show version
+                Usage: %s <command> <image> [options]
+                  list <image>                  List partitions and files of an MPC3000 disk image
+                  extract <image> [-f <folder>] Extract all files, one subfolder per partition;
+                                                without -f into ./<image name>, existing files are replaced
+                  -help                         Show this help
+                  -version                      Show version
                 """.formatted(NAME));
     }
 
     static void list(List<String> parameters) throws IOException {
         if (parameters.size() != 1)
             fail("list expects exactly one image file");
-        var image = Path.of(parameters.getFirst());
-        if (!Files.isRegularFile(image))
-            fail("image not found: " + image);
+        var image = existingImage(parameters.getFirst());
         var volumes = Control.volumes(image);
         IO.println("%s: %d partition(s), %s".formatted(image.getFileName(), volumes.size(), human(Files.size(image))));
         volumes.forEach(Boundary::print);
+    }
+
+    static void extract(List<String> parameters) throws IOException {
+        String image = null;
+        String folder = null;
+        for (var i = 0; i < parameters.size(); i++) {
+            var parameter = parameters.get(i);
+            if (parameter.equals("-f")) {
+                if (i + 1 >= parameters.size())
+                    fail("-f expects a folder");
+                folder = parameters.get(++i);
+            } else if (image == null)
+                image = parameter;
+            else
+                fail("unexpected argument: " + parameter);
+        }
+        if (image == null)
+            fail("extract expects an image file");
+        var source = existingImage(image);
+        var target = folder != null ? Path.of(folder) : Path.of(withoutExtension(source.getFileName().toString()));
+        if (Files.exists(target) && !Files.isDirectory(target))
+            fail("not a folder: " + target);
+        var extractions = Control.extract(source, target);
+        extractions.forEach(e -> IO.println("  %-12s %4d file(s) %12s".formatted(e.folder(), e.files(), human(e.bytes()))));
+        IO.println("extracted %d file(s) from %d partition(s) into %s".formatted(
+                extractions.stream().mapToInt(Entity.Extraction::files).sum(), extractions.size(), target.toAbsolutePath().normalize()));
+    }
+
+    static Path existingImage(String name) {
+        var image = Path.of(name);
+        if (!Files.isRegularFile(image))
+            fail("image not found: " + image);
+        return image;
+    }
+
+    static String withoutExtension(String fileName) {
+        var dot = fileName.lastIndexOf('.');
+        return dot > 0 ? fileName.substring(0, dot) : fileName;
     }
 
     static void print(Entity.Volume volume) {
@@ -56,7 +95,7 @@ interface Boundary {
 
                 %s  %s capacity, %d file(s), %s used""".formatted(
                 volume.label(), human(volume.capacity()), files.size(), human(volume.used())));
-        files.forEach(file -> IO.println("  %-12s %12s  %s".formatted(file.fileName(), grouped(file.size()), file.type().description())));
+        files.forEach(file -> IO.println("  %-20s %12s  %s".formatted(file.fileName(), grouped(file.size()), file.type().description())));
     }
 
     static String grouped(long bytes) {
@@ -88,14 +127,58 @@ interface Control {
 
     static List<Entity.Volume> volumes(Path image) throws IOException {
         try (var channel = FileChannel.open(image, StandardOpenOption.READ)) {
-            var first = read(channel, 0, SECTOR);
-            if (Entity.BootSector.isFat(first))
-                return List.of(volume(channel, 0));
-            var volumes = new ArrayList<Entity.Volume>();
-            for (var startSector : partitionStarts(channel))
-                volumes.add(volume(channel, startSector * SECTOR));
-            return volumes;
+            return volumes(channel);
         }
+    }
+
+    /// Writes the files of every non-empty partition into a subfolder of target named after the partition label
+    static List<Entity.Extraction> extract(Path image, Path target) throws IOException {
+        try (var channel = FileChannel.open(image, StandardOpenOption.READ)) {
+            var extractions = new ArrayList<Entity.Extraction>();
+            var volumes = volumes(channel);
+            for (var i = 0; i < volumes.size(); i++) {
+                var volume = volumes.get(i);
+                if (volume.entries().isEmpty())
+                    continue;
+                var name = volume.folderName(i + 1);
+                var folder = Files.createDirectories(target.resolve(name));
+                var fat = Entity.Fat.parse(read(channel, volume.offset() + volume.boot().fatOffset(), volume.boot().fatSize()));
+                var taken = new HashSet<String>();
+                for (var entry : volume.entries())
+                    extractFile(channel, volume, fat, entry, folder.resolve(Entity.unique(Entity.safe(entry.fileName()), taken)));
+                extractions.add(new Entity.Extraction(name, volume.entries().size(),
+                        volume.entries().stream().mapToLong(Entity.DirectoryEntry::size).sum()));
+            }
+            return extractions;
+        }
+    }
+
+    static void extractFile(FileChannel channel, Entity.Volume volume, Entity.Fat fat, Entity.DirectoryEntry entry, Path file) throws IOException {
+        var boot = volume.boot();
+        var clusters = fat.chain(entry.firstCluster(), boot.clusterCount(), boot.clustersFor(entry.size()));
+        if (clusters.size() < boot.clustersFor(entry.size()))
+            throw new IOException("broken cluster chain: " + volume.label() + "/" + entry.fileName());
+        try (var out = FileChannel.open(file, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+            var remaining = entry.size();
+            for (var cluster : clusters) {
+                var length = Math.min(remaining, boot.clusterSize());
+                var position = volume.offset() + boot.clusterOffset(cluster);
+                var written = 0L;
+                while (written < length)
+                    written += channel.transferTo(position + written, length - written, out);
+                remaining -= length;
+            }
+        }
+    }
+
+    static List<Entity.Volume> volumes(FileChannel channel) throws IOException {
+        var first = read(channel, 0, SECTOR);
+        if (Entity.BootSector.isFat(first))
+            return List.of(volume(channel, 0));
+        var volumes = new ArrayList<Entity.Volume>();
+        for (var startSector : partitionStarts(channel))
+            volumes.add(volume(channel, startSector * SECTOR));
+        return volumes;
     }
 
     static List<Long> partitionStarts(FileChannel channel) throws IOException {
@@ -202,8 +285,34 @@ interface Entity {
                     Short.toUnsignedInt(sector.getShort(22)));
         }
 
+        long fatOffset() {
+            return (long) reservedSectors * bytesPerSector;
+        }
+
+        int fatSize() {
+            return sectorsPerFat * bytesPerSector;
+        }
+
         long rootDirectoryOffset() {
-            return (long) (reservedSectors + fats * sectorsPerFat) * bytesPerSector;
+            return fatOffset() + (long) fats * fatSize();
+        }
+
+        long dataOffset() {
+            var rootBytes = (long) rootEntries * DirectoryEntry.LENGTH;
+            return rootDirectoryOffset() + (rootBytes + bytesPerSector - 1) / bytesPerSector * bytesPerSector;
+        }
+
+        /// Clusters are numbered from 2; the first one starts at the data region
+        long clusterOffset(int cluster) {
+            return dataOffset() + (cluster - 2L) * clusterSize();
+        }
+
+        int clusterCount() {
+            return (int) ((capacity() - dataOffset()) / clusterSize());
+        }
+
+        int clustersFor(long bytes) {
+            return (int) ((bytes + clusterSize() - 1) / clusterSize());
         }
 
         long capacity() {
@@ -222,6 +331,8 @@ interface Entity {
         static final int DIRECTORY = 0x10;
         static final int LONG_NAME = 0x0F;
         static final int DELETED = 0xE5;
+        /// MPC names have 16 characters: 8 in the regular name field, 8 more in otherwise unused bytes 12–19
+        static final int NAME_TAIL = 12;
 
         static List<DirectoryEntry> parse(ByteBuffer directory) {
             var entries = new ArrayList<DirectoryEntry>();
@@ -232,7 +343,7 @@ interface Entity {
                 if (marker == DELETED)
                     continue;
                 entries.add(new DirectoryEntry(
-                        text(directory, offset, 8),
+                        (raw(directory, offset, 8) + raw(directory, offset + NAME_TAIL, 8)).strip(),
                         text(directory, offset + 8, 3),
                         Byte.toUnsignedInt(directory.get(offset + 11)),
                         Short.toUnsignedInt(directory.getShort(offset + 26)),
@@ -260,7 +371,43 @@ interface Entity {
         }
     }
 
+    record Fat(ByteBuffer table) {
+
+        static final int END_OF_CHAIN = 0xFF8;
+
+        static Fat parse(ByteBuffer table) {
+            return new Fat(table);
+        }
+
+        /// FAT12 packs two 12-bit entries into three bytes
+        int next(int cluster) {
+            var offset = cluster + cluster / 2;
+            if (offset + 1 >= table.limit())
+                return END_OF_CHAIN;
+            var value = Short.toUnsignedInt(table.getShort(offset));
+            return (cluster & 1) == 0 ? value & 0xFFF : value >> 4;
+        }
+
+        /// Follows the chain from first, stopping at its end, at an invalid cluster or after limit clusters
+        List<Integer> chain(int first, int clusterCount, int limit) {
+            var clusters = new ArrayList<Integer>();
+            var cluster = first;
+            while (clusters.size() < limit && cluster >= 2 && cluster < clusterCount + 2) {
+                clusters.add(cluster);
+                cluster = next(cluster);
+            }
+            return clusters;
+        }
+    }
+
+    record Extraction(String folder, int files, long bytes) {}
+
     record Volume(String label, long offset, BootSector boot, List<DirectoryEntry> entries) {
+
+        /// Partition label as folder name, numbered when the label is missing
+        String folderName(int number) {
+            return label.isBlank() ? "PARTITION-%02d".formatted(number) : safe(label);
+        }
 
         long capacity() {
             return boot.capacity();
@@ -299,10 +446,30 @@ interface Entity {
         }
     }
 
+    /// Replaces control characters and characters reserved in file names on common file systems
+    static String safe(String name) {
+        return name.replaceAll("[\\x00-\\x1F\\x7F/\\\\:*?\"<>|]", "_");
+    }
+
     static String text(ByteBuffer buffer, int offset, int length) {
+        return raw(buffer, offset, length).strip();
+    }
+
+    static String raw(ByteBuffer buffer, int offset, int length) {
         var bytes = new byte[length];
         buffer.get(offset, bytes);
-        return new String(bytes, StandardCharsets.US_ASCII).replace('\0', ' ').strip();
+        return new String(bytes, StandardCharsets.US_ASCII).replace('\0', ' ');
+    }
+
+    /// Appends ~2, ~3, ... before the extension until the name is not taken
+    static String unique(String fileName, Set<String> taken) {
+        var dot = fileName.lastIndexOf('.');
+        var stem = dot > 0 ? fileName.substring(0, dot) : fileName;
+        var extension = dot > 0 ? fileName.substring(dot) : "";
+        var candidate = fileName;
+        for (var n = 2; !taken.add(candidate.toLowerCase()); n++)
+            candidate = stem + "~" + n + extension;
+        return candidate;
     }
 }
 
