@@ -4,9 +4,9 @@ A zero-dependency, single-file Java 25 script (`mpc3000`) that reads AKAI MPC300
 
 ## Commands
 
-- Commands and flags `help`, `version` take no dash; no arguments shows help
+- No dashed options: commands are `list`, `extract`, `help`, `version`, arguments are positional; no arguments shows help
 - `mpc3000 list <image>` — list partitions and files of an image
-- `mpc3000 extract <image> [-f <folder>]` — extract all files, one subfolder per partition containing sounds (`SND`), named after its label, holding all files of that partition; without `-f` a folder named after the image (without extension) is created in the current directory; with `-f` the given folder is created or added to; existing files are replaced
+- `mpc3000 extract <image> [<folder>]` — extract all files, one subfolder per partition containing sounds (`SND`), named after its label, holding all files of that partition; without a folder argument a folder named after the image (without extension) is created in the current directory; a given folder is created or added to; existing files are replaced
 
 ## Roadmap
 

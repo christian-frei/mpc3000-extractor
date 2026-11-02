@@ -8,7 +8,7 @@ import java.nio.file.StandardOpenOption;
 interface Boundary {
 
     String NAME = MethodHandles.lookup().lookupClass().getEnclosingClass().getName();
-    String VERSION = "2026-11-02.4";
+    String VERSION = "2026-11-02.5";
 
     record Invocation(String command, List<String> parameters) {
 
@@ -33,12 +33,13 @@ interface Boundary {
 
     static void usage() {
         IO.println("""
-                Usage: %s <command> <image> [options]
-                  list <image>                  List partitions and files of an MPC3000 disk image
-                  extract <image> [-f <folder>] Extract partitions containing sounds, one subfolder each;
-                                                without -f into ./<image name>, existing files are replaced
-                  help                          Show this help (default)
-                  version                       Show version
+                Usage: %s <command> [arguments]
+                  list <image>               List partitions and files of an MPC3000 disk image
+                  extract <image> [<folder>] Extract partitions containing sounds, one subfolder each,
+                                             into folder (created or added to) or ./<image name>;
+                                             existing files are replaced
+                  help                       Show this help (default)
+                  version                    Show version
                 """.formatted(NAME));
     }
 
@@ -52,23 +53,10 @@ interface Boundary {
     }
 
     static void extract(List<String> parameters) throws IOException {
-        String image = null;
-        String folder = null;
-        for (var i = 0; i < parameters.size(); i++) {
-            var parameter = parameters.get(i);
-            if (parameter.equals("-f")) {
-                if (i + 1 >= parameters.size())
-                    fail("-f expects a folder");
-                folder = parameters.get(++i);
-            } else if (image == null)
-                image = parameter;
-            else
-                fail("unexpected argument: " + parameter);
-        }
-        if (image == null)
-            fail("extract expects an image file");
-        var source = existingImage(image);
-        var target = folder != null ? Path.of(folder) : Path.of(withoutExtension(source.getFileName().toString()));
+        if (parameters.isEmpty() || parameters.size() > 2)
+            fail("extract expects an image file and an optional folder");
+        var source = existingImage(parameters.getFirst());
+        var target = parameters.size() == 2 ? Path.of(parameters.get(1)) : Path.of(withoutExtension(source.getFileName().toString()));
         if (Files.exists(target) && !Files.isDirectory(target))
             fail("not a folder: " + target);
         var extractions = Control.extract(source, target);

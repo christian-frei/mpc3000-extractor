@@ -16,9 +16,9 @@ sudo ln -s $(pwd)/mpc3000 /usr/local/bin/mpc3000
 ## Usage
 
 ```
-mpc3000 list HD0.iso                 # partitions, files, sizes, MPC file types
-mpc3000 extract HD0.iso              # into ./HD0/<partition label>/
-mpc3000 extract HD0.iso -f samples   # into ./samples/<partition label>/, created or added to
+mpc3000 list HD0.iso              # partitions, files, sizes, MPC file types
+mpc3000 extract HD0.iso           # into ./HD0/<partition label>/
+mpc3000 extract HD0.iso samples   # into ./samples/<partition label>/, created or added to
 ```
 
 `extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
