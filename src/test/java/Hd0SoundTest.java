@@ -5,7 +5,7 @@ import christianfrei.mpc3000.sound.boundary.Sounds;
 
 /// Regression against a real MPC3000 hard disk: every extracted sound converts and reads back with the JDK's audio reader
 void main() throws Exception {
-    var image = Path.of("test/HD0.iso");
+    var image = Path.of("src/test/resources/HD0.iso");
     if (!Files.exists(image)) {
         IO.println("skipped: " + image + " not present");
         return;

@@ -28,11 +28,11 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 ## Build and test
 
 - Build: `zb.sh` (installed in `~/bin`) → `zbo/app.jar`; `./mpc3000` is a launcher for it
-- Test: `zunit` runs `test/*Test.java` against `zbo/app.jar`
+- Test: `zunit` runs `src/test/java/*Test.java` against `zbo/app.jar`
 - One test file per requirement group (`image`: `ListImageTest` ↔ R1, `ExtractImageTest` ↔ R2; `sound`: `ConvertSoundsTest` ↔ R1, `PlaybackPointsTest` ↔ R2), one `Case` row per statement id; spec ids and rows stay bijective
 - WAV tests read files back with `javax.sound.sampled.AudioSystem` (import the class, not `module java.desktop` — `java.awt.List` clashes)
-- `test/FatImage.java` builds synthetic FAT12 floppy and partitioned images, `test/SndFile.java` builds SND files and reads WAV chunks, so EARS tests need no real image
-- `test/Hd0ImageTest.java` and `test/Hd0SoundTest.java` are regression tests against `test/HD0.iso` (git-ignored, skipped when absent); image checksums come from an independent FAT12 reader, all 165 sounds must convert
+- `src/test/java/FatImage.java` builds synthetic FAT12 floppy and partitioned images, `src/test/java/SndFile.java` builds SND files and reads WAV chunks, so EARS tests need no real image
+- `src/test/java/Hd0ImageTest.java` and `src/test/java/Hd0SoundTest.java` are regression tests against `src/test/resources/HD0.iso` (git-ignored, skipped when absent); image checksums come from an independent FAT12 reader, all 165 sounds must convert
 
 ## Image format
 
@@ -48,6 +48,6 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 
 ## Workflow
 
-- Test image: `test/HD0.iso`: 23 partitions, A–F hold 203 files
+- Test image: `src/test/resources/HD0.iso`: 23 partitions, A–F hold 203 files
 - Never extract into the repo; use a temp folder
 - Git: commit often using conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`)

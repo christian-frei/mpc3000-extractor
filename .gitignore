@@ -1,4 +1,4 @@
 zbo/
-test/*.iso
-test/*.img
+src/test/resources/*.iso
+src/test/resources/*.img
 .DS_Store
