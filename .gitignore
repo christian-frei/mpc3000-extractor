@@ -1,2 +1,4 @@
-test/
+zbo/
+test/*.iso
+test/*.img
 .DS_Store
