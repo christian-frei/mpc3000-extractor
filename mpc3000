@@ -1,0 +1,311 @@
+#!/usr/bin/env -S java --source 25
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
+import java.nio.file.StandardOpenOption;
+
+interface Boundary {
+
+    String NAME = MethodHandles.lookup().lookupClass().getEnclosingClass().getName();
+    String VERSION = "2026-11-02.1";
+
+    record Invocation(String command, List<String> parameters) {
+
+        static Invocation parse(List<String> args) {
+            if (args.isEmpty())
+                return new Invocation("-help", List.of());
+            return new Invocation(args.getFirst(), args.subList(1, args.size()));
+        }
+    }
+
+    static void run(List<String> args) throws IOException {
+        IO.println(NAME + " " + VERSION);
+        var invocation = Invocation.parse(args);
+        switch (invocation.command()) {
+            case "-help" -> usage();
+            case "-version" -> {}
+            case "list" -> list(invocation.parameters());
+            default -> fail("unknown command: " + invocation.command());
+        }
+    }
+
+    static void usage() {
+        IO.println("""
+                Usage: %s <command> <image>
+                  list <image>  List partitions and files of an MPC3000 disk image
+                  -help         Show this help
+                  -version      Show version
+                """.formatted(NAME));
+    }
+
+    static void list(List<String> parameters) throws IOException {
+        if (parameters.size() != 1)
+            fail("list expects exactly one image file");
+        var image = Path.of(parameters.getFirst());
+        if (!Files.isRegularFile(image))
+            fail("image not found: " + image);
+        var volumes = Control.volumes(image);
+        IO.println("%s: %d partition(s), %s".formatted(image.getFileName(), volumes.size(), human(Files.size(image))));
+        volumes.forEach(Boundary::print);
+    }
+
+    static void print(Entity.Volume volume) {
+        var files = volume.entries();
+        IO.println("""
+
+                %s  %s capacity, %d file(s), %s used""".formatted(
+                volume.label(), human(volume.capacity()), files.size(), human(volume.used())));
+        files.forEach(file -> IO.println("  %-12s %12s  %s".formatted(file.fileName(), grouped(file.size()), file.type().description())));
+    }
+
+    static String grouped(long bytes) {
+        return "%,d".formatted(bytes);
+    }
+
+    static String human(long bytes) {
+        if (bytes < 1024)
+            return bytes + " B";
+        var units = "KMGT";
+        var value = (double) bytes;
+        var unit = -1;
+        while (value >= 1024 && unit < units.length() - 1) {
+            value /= 1024;
+            unit++;
+        }
+        return "%.1f %siB".formatted(value, units.charAt(unit));
+    }
+
+    static void fail(String message) {
+        System.err.println(NAME + ": " + message);
+        System.exit(1);
+    }
+}
+
+interface Control {
+
+    int SECTOR = 512;
+
+    static List<Entity.Volume> volumes(Path image) throws IOException {
+        try (var channel = FileChannel.open(image, StandardOpenOption.READ)) {
+            var first = read(channel, 0, SECTOR);
+            if (Entity.BootSector.isFat(first))
+                return List.of(volume(channel, 0));
+            var volumes = new ArrayList<Entity.Volume>();
+            for (var startSector : partitionStarts(channel))
+                volumes.add(volume(channel, startSector * SECTOR));
+            return volumes;
+        }
+    }
+
+    static List<Long> partitionStarts(FileChannel channel) throws IOException {
+        var starts = new ArrayList<Long>();
+        for (var entry : Entity.PartitionEntry.of(read(channel, 0, SECTOR))) {
+            if (entry.isFat())
+                starts.add(entry.firstSector());
+            else if (entry.isExtended())
+                starts.addAll(logicalStarts(channel, entry.firstSector()));
+        }
+        return starts;
+    }
+
+    /// Walks the EBR chain: the first entry is relative to its own EBR, the link to the next EBR relative to the extended partition
+    static List<Long> logicalStarts(FileChannel channel, long extendedStart) throws IOException {
+        var starts = new ArrayList<Long>();
+        var ebr = extendedStart;
+        while (true) {
+            var entries = Entity.PartitionEntry.of(read(channel, ebr * SECTOR, SECTOR));
+            if (entries.isEmpty())
+                return starts;
+            if (entries.getFirst().isFat())
+                starts.add(ebr + entries.getFirst().firstSector());
+            if (entries.size() < 2 || !entries.get(1).isExtended())
+                return starts;
+            ebr = extendedStart + entries.get(1).firstSector();
+        }
+    }
+
+    static Entity.Volume volume(FileChannel channel, long offset) throws IOException {
+        var boot = Entity.BootSector.parse(read(channel, offset, SECTOR));
+        var root = read(channel, offset + boot.rootDirectoryOffset(), boot.rootEntries() * Entity.DirectoryEntry.LENGTH);
+        var entries = Entity.DirectoryEntry.parse(root);
+        var label = entries.stream()
+                .filter(Entity.DirectoryEntry::isVolumeLabel)
+                .map(Entity.DirectoryEntry::fileName)
+                .findFirst()
+                .orElse(boot.label());
+        var files = entries.stream().filter(Entity.DirectoryEntry::isFile).toList();
+        return new Entity.Volume(label, offset, boot, files);
+    }
+
+    static ByteBuffer read(FileChannel channel, long position, int length) throws IOException {
+        var buffer = ByteBuffer.allocate(length).order(ByteOrder.LITTLE_ENDIAN);
+        while (buffer.hasRemaining() && channel.read(buffer, position + buffer.position()) > 0) {}
+        return buffer.flip();
+    }
+}
+
+interface Entity {
+
+    record PartitionEntry(int type, long firstSector, long sectors) {
+
+        static final int TABLE_OFFSET = 0x1BE;
+
+        static List<PartitionEntry> of(ByteBuffer sector) {
+            if (!BootSector.hasSignature(sector))
+                return List.of();
+            var entries = new ArrayList<PartitionEntry>();
+            for (var i = 0; i < 4; i++) {
+                var offset = TABLE_OFFSET + i * 16;
+                var type = Byte.toUnsignedInt(sector.get(offset + 4));
+                if (type != 0)
+                    entries.add(new PartitionEntry(type,
+                            Integer.toUnsignedLong(sector.getInt(offset + 8)),
+                            Integer.toUnsignedLong(sector.getInt(offset + 12))));
+            }
+            return entries;
+        }
+
+        boolean isExtended() {
+            return type == 0x05 || type == 0x0F || type == 0x85;
+        }
+
+        boolean isFat() {
+            return type == 0x01 || type == 0x04 || type == 0x06 || type == 0x0E;
+        }
+    }
+
+    record BootSector(String label, int bytesPerSector, int sectorsPerCluster, int reservedSectors,
+                      int fats, int rootEntries, long totalSectors, int sectorsPerFat) {
+
+        static boolean hasSignature(ByteBuffer sector) {
+            return Short.toUnsignedInt(sector.getShort(510)) == 0xAA55;
+        }
+
+        /// A FAT volume starts with a jump instruction and a sane BPB; an MBR does not
+        static boolean isFat(ByteBuffer sector) {
+            var jump = Byte.toUnsignedInt(sector.get(0));
+            var bytesPerSector = Short.toUnsignedInt(sector.getShort(11));
+            return hasSignature(sector) && (jump == 0xEB || jump == 0xE9) && bytesPerSector == 512;
+        }
+
+        static BootSector parse(ByteBuffer sector) {
+            var totalSectors = Short.toUnsignedInt(sector.getShort(19));
+            return new BootSector(
+                    text(sector, 43, 11),
+                    Short.toUnsignedInt(sector.getShort(11)),
+                    Byte.toUnsignedInt(sector.get(13)),
+                    Short.toUnsignedInt(sector.getShort(14)),
+                    Byte.toUnsignedInt(sector.get(16)),
+                    Short.toUnsignedInt(sector.getShort(17)),
+                    totalSectors != 0 ? totalSectors : Integer.toUnsignedLong(sector.getInt(32)),
+                    Short.toUnsignedInt(sector.getShort(22)));
+        }
+
+        long rootDirectoryOffset() {
+            return (long) (reservedSectors + fats * sectorsPerFat) * bytesPerSector;
+        }
+
+        long capacity() {
+            return totalSectors * bytesPerSector;
+        }
+
+        long clusterSize() {
+            return (long) sectorsPerCluster * bytesPerSector;
+        }
+    }
+
+    record DirectoryEntry(String name, String extension, int attributes, int firstCluster, long size) {
+
+        static final int LENGTH = 32;
+        static final int VOLUME_LABEL = 0x08;
+        static final int DIRECTORY = 0x10;
+        static final int LONG_NAME = 0x0F;
+        static final int DELETED = 0xE5;
+
+        static List<DirectoryEntry> parse(ByteBuffer directory) {
+            var entries = new ArrayList<DirectoryEntry>();
+            for (var offset = 0; offset + LENGTH <= directory.limit(); offset += LENGTH) {
+                var marker = Byte.toUnsignedInt(directory.get(offset));
+                if (marker == 0)
+                    break;
+                if (marker == DELETED)
+                    continue;
+                entries.add(new DirectoryEntry(
+                        text(directory, offset, 8),
+                        text(directory, offset + 8, 3),
+                        Byte.toUnsignedInt(directory.get(offset + 11)),
+                        Short.toUnsignedInt(directory.getShort(offset + 26)),
+                        Integer.toUnsignedLong(directory.getInt(offset + 28))));
+            }
+            return entries;
+        }
+
+        boolean isVolumeLabel() {
+            return attributes != LONG_NAME && (attributes & VOLUME_LABEL) != 0;
+        }
+
+        boolean isFile() {
+            return attributes != LONG_NAME && (attributes & (VOLUME_LABEL | DIRECTORY)) == 0;
+        }
+
+        String fileName() {
+            if (isVolumeLabel())
+                return (name + extension).strip();
+            return extension.isEmpty() ? name : name + "." + extension;
+        }
+
+        FileType type() {
+            return FileType.of(extension);
+        }
+    }
+
+    record Volume(String label, long offset, BootSector boot, List<DirectoryEntry> entries) {
+
+        long capacity() {
+            return boot.capacity();
+        }
+
+        /// Space occupied on disk, rounded up to whole clusters
+        long used() {
+            var cluster = boot.clusterSize();
+            return entries.stream().mapToLong(e -> (e.size() + cluster - 1) / cluster * cluster).sum();
+        }
+    }
+
+    enum FileType {
+        SND("sound"),
+        PGM("program"),
+        SEQ("sequence"),
+        ALL("all sequences and songs"),
+        APS("all programs and sounds"),
+        UNKNOWN("unknown");
+
+        final String description;
+
+        FileType(String description) {
+            this.description = description;
+        }
+
+        String description() {
+            return description;
+        }
+
+        static FileType of(String extension) {
+            return Arrays.stream(values())
+                    .filter(type -> type.name().equalsIgnoreCase(extension))
+                    .findFirst()
+                    .orElse(UNKNOWN);
+        }
+    }
+
+    static String text(ByteBuffer buffer, int offset, int length) {
+        var bytes = new byte[length];
+        buffer.get(offset, bytes);
+        return new String(bytes, StandardCharsets.US_ASCII).replace('\0', ' ').strip();
+    }
+}
+
+void main(String... args) throws Exception {
+    Boundary.run(List.of(args));
+}
