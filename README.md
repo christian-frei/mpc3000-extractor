@@ -1,17 +1,19 @@
 # mpc3000
 
-Lists and extracts the files on AKAI MPC3000 hard disk and floppy images. It's a zero-dependency, single-file Java 25 script.
+Lists and extracts the files on AKAI MPC3000 hard disk and floppy images. A zero-dependency Java 25 CLI app; sound conversion to WAV and restoring folders into new images are planned.
 
 ## Prerequisites
 
-Java 25+
+Java 25+, [zb](https://github.com/AdamBien/zb), [zunit](https://github.com/AdamBien/zunit) for tests
 
-## Install
+## Build and Install
 
 ```
-chmod +x mpc3000
+zb.sh
 sudo ln -s $(pwd)/mpc3000 /usr/local/bin/mpc3000
 ```
+
+`mpc3000` is a launcher for `zbo/app.jar`.
 
 ## Usage
 
@@ -22,6 +24,14 @@ mpc3000 extract HD0.iso samples   # into ./samples/<partition label>/, created o
 ```
 
 `extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
+
+## Test
+
+```
+zb.sh && zunit
+```
+
+Requirements are EARS statements in [the image spec](src/main/java/christianfrei/mpc3000/image/package-info.java); each statement id is one row in the tests.
 
 ## Image Format
 
