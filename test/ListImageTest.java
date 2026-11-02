@@ -44,8 +44,13 @@ void main() throws Exception {
                 assertContains(R1_5, message, "not an MPC3000 image");
             }));
 
-    for (var c : cases)
-        c.check().run();
+    for (var c : cases) {
+        try {
+            c.check().run();
+        } catch (Exception e) {
+            throw new AssertionError("%s — %s".formatted(c.req(), c.req().statement()), e);
+        }
+    }
 }
 
 void assertContains(Requirement.Rn req, String actual, String expected) {
