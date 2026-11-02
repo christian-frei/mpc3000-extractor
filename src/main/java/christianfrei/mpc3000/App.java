@@ -1,15 +1,17 @@
 package christianfrei.mpc3000;
 
 import christianfrei.mpc3000.image.boundary.Images;
+import christianfrei.mpc3000.sound.boundary.Sounds;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /// Parses the command line and dispatches to the business components
 public interface App {
 
     String NAME = "mpc3000";
-    String VERSION = "2026-11-02.6";
+    String VERSION = "2026-11-02.7";
 
     record Invocation(String command, List<String> parameters) {
 
@@ -47,6 +49,12 @@ public interface App {
                 var target = parameters.size() == 2 ? Path.of(parameters.get(1)) : Images.defaultTarget(image);
                 IO.println(Images.extract(image, target));
             }
+            case "convert" -> {
+                if (parameters.isEmpty() || parameters.size() > 2)
+                    throw new IllegalArgumentException("convert expects an SND file or folder and an optional target folder");
+                var target = parameters.size() == 2 ? Optional.of(Path.of(parameters.get(1))) : Optional.<Path>empty();
+                Sounds.convert(Path.of(parameters.getFirst()), target, IO::println);
+            }
             default -> throw new IllegalArgumentException("unknown command: " + invocation.command());
         }
     }
@@ -58,6 +66,9 @@ public interface App {
                   extract <image> [<folder>] Extract partitions containing sounds, one subfolder each,
                                              into folder (created or added to) or ./<image name>;
                                              existing files are replaced
+                  convert <snd|folder> [<folder>]
+                                             Convert an SND file or all SND files below a folder to WAV,
+                                             next to each SND or mirrored into folder
                   help                       Show this help (default)
                   version                    Show version""".formatted(NAME));
     }
