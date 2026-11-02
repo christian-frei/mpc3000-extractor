@@ -8,13 +8,13 @@ import java.nio.file.StandardOpenOption;
 interface Boundary {
 
     String NAME = MethodHandles.lookup().lookupClass().getEnclosingClass().getName();
-    String VERSION = "2026-11-02.3";
+    String VERSION = "2026-11-02.4";
 
     record Invocation(String command, List<String> parameters) {
 
         static Invocation parse(List<String> args) {
             if (args.isEmpty())
-                return new Invocation("-help", List.of());
+                return new Invocation("help", List.of());
             return new Invocation(args.getFirst(), args.subList(1, args.size()));
         }
     }
@@ -23,8 +23,8 @@ interface Boundary {
         IO.println(NAME + " " + VERSION);
         var invocation = Invocation.parse(args);
         switch (invocation.command()) {
-            case "-help" -> usage();
-            case "-version" -> {}
+            case "help" -> usage();
+            case "version" -> {}
             case "list" -> list(invocation.parameters());
             case "extract" -> extract(invocation.parameters());
             default -> fail("unknown command: " + invocation.command());
@@ -35,10 +35,10 @@ interface Boundary {
         IO.println("""
                 Usage: %s <command> <image> [options]
                   list <image>                  List partitions and files of an MPC3000 disk image
-                  extract <image> [-f <folder>] Extract all files, one subfolder per partition;
+                  extract <image> [-f <folder>] Extract partitions containing sounds, one subfolder each;
                                                 without -f into ./<image name>, existing files are replaced
-                  -help                         Show this help
-                  -version                      Show version
+                  help                          Show this help (default)
+                  version                       Show version
                 """.formatted(NAME));
     }
 
@@ -131,14 +131,14 @@ interface Control {
         }
     }
 
-    /// Writes the files of every non-empty partition into a subfolder of target named after the partition label
+    /// Writes all files of every partition containing sounds into a subfolder of target named after the partition label
     static List<Entity.Extraction> extract(Path image, Path target) throws IOException {
         try (var channel = FileChannel.open(image, StandardOpenOption.READ)) {
             var extractions = new ArrayList<Entity.Extraction>();
             var volumes = volumes(channel);
             for (var i = 0; i < volumes.size(); i++) {
                 var volume = volumes.get(i);
-                if (volume.entries().isEmpty())
+                if (!volume.hasSounds())
                     continue;
                 var name = volume.folderName(i + 1);
                 var folder = Files.createDirectories(target.resolve(name));
@@ -411,6 +411,10 @@ interface Entity {
 
         long capacity() {
             return boot.capacity();
+        }
+
+        boolean hasSounds() {
+            return entries.stream().anyMatch(entry -> entry.type() == FileType.SND);
         }
 
         /// Space occupied on disk, rounded up to whole clusters

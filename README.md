@@ -21,7 +21,7 @@ mpc3000 extract HD0.iso              # into ./HD0/<partition label>/
 mpc3000 extract HD0.iso -f samples   # into ./samples/<partition label>/, created or added to
 ```
 
-`extract` writes one subfolder per non-empty partition and replaces existing files.
+`extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
 
 ## Image Format
 
