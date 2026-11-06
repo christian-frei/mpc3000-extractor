@@ -125,10 +125,22 @@ void main() throws Exception {
             }),
             new Case(R1_8, () -> {
                 var folder = Files.createTempDirectory("mpc3000-");
-                var output = "dd: /dev/rdisk9: Input/output error\rdd: /dev/rdisk9: Input/output error\r2878+2 records in\r2880+0 records out\r";
+                var output = """
+                        dd: /dev/rdisk9: Input/output error
+                        dd: /dev/rdisk9: Input/output error
+                        2537+1 records in
+                        2537+1 records out
+                        dd: /dev/rdisk9: Input/output error
+                        dd: /dev/rdisk9: Input/output error
+                        2537+2 records in
+                        2537+2 records out
+                        2878+2 records in
+                        2880+0 records out
+                        1474560 bytes transferred in 61.2 secs (24094 bytes/sec)
+                        """;
                 var drives = new FakeDrives(List.of(new Disk("disk9", content.length)), content, output, false);
                 var message = rejection(IOException.class, () -> Floppies.read(Optional.empty(), folder, drives, _ -> {}));
-                assertContains(R1_8, message, "2 sector(s) could not be read");
+                assert message.startsWith("2 sector(s) could not be read") : "%s — %s — expected 2 sector(s) but got: %s".formatted(R1_8, R1_8.statement(), message);
                 assert Files.exists(folder.resolve("FLOPPY01.img")) : R1_8 + " — " + R1_8.statement() + " — partial image not kept";
             }),
             new Case(R1_9, () -> {

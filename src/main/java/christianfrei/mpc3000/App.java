@@ -12,7 +12,7 @@ import java.util.Optional;
 public interface App {
 
     String NAME = "mpc3000";
-    String VERSION = "2026-11-06.4";
+    String VERSION = "2026-11-06.5";
 
     record Invocation(String command, List<String> parameters) {
 
