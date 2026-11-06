@@ -42,6 +42,11 @@ void main() throws Exception {
             new Case(R1_5, () -> {
                 var message = rejection(() -> Images.list(FatImage.write(new byte[4096])));
                 assertContains(R1_5, message, "not an MPC3000 image");
+            }),
+            new Case(R1_6, () -> {
+                var unlabeled = FatImage.Partition.of("", new FatImage.Entry("SOUND001", "SND", 700, 2, 3));
+                var listing = Images.list(FatImage.write(FatImage.floppy(unlabeled)));
+                assertContains(R1_6, listing, "\n(no label)  32.0 KiB capacity, 1 file(s)");
             }));
 
     for (var c : cases) {

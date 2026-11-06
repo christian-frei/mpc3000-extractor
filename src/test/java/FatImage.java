@@ -55,9 +55,12 @@ class FatImage {
         fat[1] = (byte) 0xFF;
         fat[2] = (byte) 0xFF;
         var root = 3 * SECTOR;
-        ascii(buffer, root, partition.label(), 11);
-        buffer.put(root + 11, (byte) 0x08);
-        var slot = 1;
+        var slot = 0;
+        if (!partition.label().isBlank()) {
+            ascii(buffer, root, partition.label(), 11);
+            buffer.put(root + 11, (byte) 0x08);
+            slot = 1;
+        }
         for (var entry : partition.entries()) {
             var offset = root + slot++ * 32;
             var name = "%-16s".formatted(entry.name());
@@ -104,6 +107,14 @@ class FatImage {
             var file = Files.createTempFile("mpc3000-", ".img");
             file.toFile().deleteOnExit();
             return Files.write(file, image);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    static Path write(Path folder, String fileName, byte[] image) {
+        try {
+            return Files.write(Files.createDirectories(folder).resolve(fileName), image);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

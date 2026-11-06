@@ -29,7 +29,8 @@ void main() throws Exception {
                 assert !Files.exists(target.resolve("MPC-PART--C")) : R2_2 + " — " + R2_2.statement() + " — empty partition was extracted";
             }),
             new Case(R2_3, () -> {
-                var target = Images.defaultTarget(Path.of("some", "folder", "HD0.iso"));
+                var image = FatImage.write(Files.createTempDirectory("mpc3000-"), "HD0.iso", FatImage.disk(withSounds));
+                var target = Images.defaultTarget(image);
                 assert target.equals(Path.of("HD0")) : "%s — %s — expected HD0 but got %s".formatted(R2_3, R2_3.statement(), target);
             }),
             new Case(R2_4, () -> {
@@ -64,6 +65,14 @@ void main() throws Exception {
                 var file = Files.createTempFile("mpc3000-", ".txt");
                 var message = rejection(IllegalArgumentException.class, () -> Images.extract(disk, file));
                 assertContains(R2_8, message, "not a folder");
+            }),
+            new Case(R2_10, () -> {
+                var unlabeled = FatImage.Partition.of("", sound);
+                var image = FatImage.write(Files.createTempDirectory("mpc3000-"), "FLOPPY07.img", FatImage.floppy(unlabeled));
+                var target = extract(image);
+                assertContent(R2_10, target.resolve("FLOPPY07/SOUND001.SND"), sound);
+                var folder = Images.defaultTarget(image).resolve("FLOPPY07");
+                assert folder.equals(Path.of("FLOPPY07")) : "%s — %s — expected ./FLOPPY07 without target but got %s".formatted(R2_10, R2_10.statement(), folder);
             }),
             new Case(R2_9, () -> {
                 var truncated = new FatImage.Entry("SOUND003", "SND", 1500, 2);
