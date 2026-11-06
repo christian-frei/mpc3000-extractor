@@ -4,11 +4,12 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 
 ## Commands
 
-- No dashed options: commands are `list`, `extract`, `convert`, `floppy-read`, `help`, `version`, arguments are positional; no arguments shows help
+- No dashed options: commands are `list`, `extract`, `convert`, `restore`, `floppy-read`, `help`, `version`, arguments are positional; no arguments shows help
 - `mpc3000 list <image>` — list partitions and files of an image
 - `mpc3000 extract <image> [<folder>]` — one subfolder per partition containing sounds (`SND`), named after its label, holding all files of that partition; an unlabeled floppy gets a folder named after the image instead; without a folder argument `./<image name without extension>` is used; a given folder is created or added to; existing files are replaced
 - `mpc3000 floppy-read [<image>]` — copy the floppy in the USB drive (auto-detected: the one external disk of 1.44 MB or 720 KB) into an image file, by default the lowest free `./FLOPPYnn.img`; never overwrites; admin rights via `sudo` in the terminal (`sudo /bin/sh -c "dd … ; chown …"`), the disk stays mounted; refuses without a terminal (e.g. the Claude Code `!` prompt) — the macOS password dialog cannot be used: its helper runs outside the terminal app and macOS denies it raw access to removable disks (`Operation not permitted`); bad sectors are zero-filled, counted, exit code 1
 - `mpc3000 convert <snd|folder> [<folder>]` — every `SND` below a folder (or one file) → 16-bit mono 44.1 kHz `WAV`, whole sample, start point as `cue`, loop as `smpl`; next to each SND or mirrored into folder; failed files are listed, the rest converted, exit code 1
+- `mpc3000 restore <folder> [<image>]` — partition folders `MPC-PART--A`…`W` → 23-partition hard disk image (779,091,968 bytes, written sparse), a folder of files alone → 1.44 MB floppy; by default `<folder>.iso`/`.img` next to the folder; never overwrites; files contiguous in name order, names uppercased; non-MPC files left out and listed, hidden files ignored
 
 ## Roadmap
 
@@ -16,7 +17,7 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 2. `extract` — done
 3. `convert` — done (`sound` BC)
 3b. `floppy-read` — done (`floppy` BC, macOS only)
-4. `restore` — write host folders (one per partition) back into a new MPC3000 image file; extends the `image` BC (decision D2), verified by a round trip extract → restore → extract
+4. `restore` — done (`image` BC R3, decision D2); round trip extract → restore → extract verified on HD0 and FLOPPY01
 5. later: `../zaudioconvert` reuses the `sound` BC from this project's JAR instead of duplicating the SND parser
 
 ## Structure and specs
@@ -31,15 +32,18 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 
 - Build: `zb.sh` (installed in `~/bin`) → `zbo/app.jar`; `./mpc3000` is a launcher for it
 - Test: `zunit` runs `src/test/java/*Test.java` against `zbo/app.jar`
-- One test file per requirement group (`image`: `ListImageTest` ↔ R1, `ExtractImageTest` ↔ R2; `sound`: `ConvertSoundsTest` ↔ R1, `PlaybackPointsTest` ↔ R2; `floppy`: `ReadFloppyTest` ↔ R1 with a fake `Drives`), one `Case` row per statement id; spec ids and rows stay bijective
+- One test file per requirement group (`image`: `ListImageTest` ↔ R1, `ExtractImageTest` ↔ R2, `RestoreImageTest` ↔ R3; `sound`: `ConvertSoundsTest` ↔ R1, `PlaybackPointsTest` ↔ R2; `floppy`: `ReadFloppyTest` ↔ R1 with a fake `Drives`), one `Case` row per statement id; spec ids and rows stay bijective
 - WAV tests read files back with `javax.sound.sampled.AudioSystem` (import the class, not `module java.desktop` — `java.awt.List` clashes)
 - `src/test/java/FatImage.java` builds synthetic FAT12 floppy and partitioned images, `src/test/java/SndFile.java` builds SND files and reads WAV chunks, so EARS tests need no real image
 - `src/test/java/Hd0ImageTest.java` and `src/test/java/Hd0SoundTest.java` are regression tests against `src/test/resources/HD0.iso` (git-ignored, skipped when absent); image checksums come from an independent FAT12 reader, all 165 sounds must convert
 - `src/test/java/Floppy01ImageTest.java` is a regression test against `src/test/resources/FLOPPY01.img` (a real floppy, git-ignored, skipped when absent); checksums come from the macOS FAT driver reading the mounted disk
+- `src/test/java/Hd0RestoreTest.java` and `src/test/java/Floppy01RestoreTest.java` round-trip the real images through extract → restore → extract; MBR, EBRs, boot sectors and the empty partitions G–W must be byte-identical to HD0, the boot sector to FLOPPY01; `fsck_msdos -n` on the attached image reports the same as for the original (2 orphaned clusters per HD partition: the reserved clusters 2 and 3)
 
 ## Image format
 
 - Hard disk images: MBR with an extended partition (type `0x05`) chaining logical FAT12 partitions (type `0x01`), each ~32 MB, labeled `MPC-PART--A`, `MPC-PART--B`, ...
+- HD0 layout: 23 slots of 64,260 sectors (4 cylinders of 255 × 63); EBR k at sector 63 (k = 0) or 64,260·k, its partition 63 sectors later; disk signature `CA FE 20 07` at 0x1B8 of MBR and every EBR; every EBR also holds 16, 16 at 0x18 and the start sectors of all 23 partitions (u32) from 0x80
+- HD partition boot sector: no boot code, 16 sectors/cluster, 512 root entries, 11 sectors/FAT, 16 sectors/track, 16 heads, hidden sectors = start, serial `nn 00 FE CA` (nn = partition number); FAT starts `F8 FF FF FF FF 00`, so files start at cluster 4; the label is the first root entry; usable clusters are bounded by the FAT (3,750), not the data region
 - Floppy images: a single raw FAT12 volume without partition table, 1.44 MB (2880 sectors); no volume label and an empty OEM name (boot sector starts `EB 34 90` followed by zeros)
 - Hard disk partitions carry OEM name `MPC-3000` and labels `MPC-PART--A`…; root directory is flat, no dates; files can be fragmented (follow the FAT chain)
 - macOS mounts MPC floppies read-write and writes `.fseventsd` onto them; its FAT driver shows only 8.3 names (`PROGRAM_.pgm` for `PROGRAM_01.PGM`) — always read the raw device

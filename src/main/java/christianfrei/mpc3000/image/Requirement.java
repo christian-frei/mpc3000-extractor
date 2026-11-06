@@ -46,7 +46,35 @@ public @interface Requirement {
         /// If a file's cluster chain ends before its size is reached, then the BC shall reject the extraction naming the file.
         R2_9("R2.9", "If a file's cluster chain ends before its size is reached, then the BC shall reject the extraction naming the file."),
         /// When an unpartitioned floppy image without volume label is extracted, the BC shall write its files into a folder named after the image without its extension, inside the target folder or, without a target folder, in the current directory.
-        R2_10("R2.10", "When an unpartitioned floppy image without volume label is extracted, the BC shall write its files into a folder named after the image without its extension, inside the target folder or, without a target folder, in the current directory.");
+        R2_10("R2.10", "When an unpartitioned floppy image without volume label is extracted, the BC shall write its files into a folder named after the image without its extension, inside the target folder or, without a target folder, in the current directory."),
+        /// When a folder of partition folders is restored, the BC shall write a hard disk image with the MPC3000's 23-partition layout (`MPC-PART--A` … `MPC-PART--W`, 64,260 sectors per partition, 779,091,968 bytes), putting each folder's files into the partition of the same label and leaving the other partitions empty.
+        R3_1("R3.1", "When a folder of partition folders is restored, the BC shall write a hard disk image with the MPC3000's 23-partition layout (`MPC-PART--A` … `MPC-PART--W`, 64,260 sectors per partition, 779,091,968 bytes), putting each folder's files into the partition of the same label and leaving the other partitions empty."),
+        /// When a folder of files is restored, the BC shall write a 1.44 MB floppy image holding them.
+        R3_2("R3.2", "When a folder of files is restored, the BC shall write a 1.44 MB floppy image holding them."),
+        /// When an image is restored, the BC shall write partition table, boot sectors, FATs and directory entries in the MPC3000's own layout: no boot code, no timestamps, 16-character names, the first file at cluster 4 on hard disk partitions and at cluster 2 on floppies.
+        R3_3("R3.3", "When an image is restored, the BC shall write partition table, boot sectors, FATs and directory entries in the MPC3000's own layout: no boot code, no timestamps, 16-character names, the first file at cluster 4 on hard disk partitions and at cluster 2 on floppies."),
+        /// When an image is restored, the BC shall store every file contiguously in name order with its content unchanged, so that extracting the image yields the same files.
+        R3_4("R3.4", "When an image is restored, the BC shall store every file contiguously in name order with its content unchanged, so that extracting the image yields the same files."),
+        /// When a file name contains lowercase letters, the BC shall store it in uppercase.
+        R3_5("R3.5", "When a file name contains lowercase letters, the BC shall store it in uppercase."),
+        /// When no image name is given, the BC shall write `<folder name>.iso` for a hard disk or `<folder name>.img` for a floppy next to the folder.
+        R3_6("R3.6", "When no image name is given, the BC shall write `<folder name>.iso` for a hard disk or `<folder name>.img` for a floppy next to the folder."),
+        /// If the image file already exists, then the BC shall reject the request without touching the file.
+        R3_7("R3.7", "If the image file already exists, then the BC shall reject the request without touching the file."),
+        /// If a folder holds files that are not MPC files (`SND`, `PGM`, `SEQ`, `ALL`, `APS`), then the BC shall leave them out of the image and list them.
+        R3_8("R3.8", "If a folder holds files that are not MPC files (`SND`, `PGM`, `SEQ`, `ALL`, `APS`), then the BC shall leave them out of the image and list them."),
+        /// The BC shall ignore hidden files and folders, whose names start with `.`, when restoring.
+        R3_9("R3.9", "The BC shall ignore hidden files and folders, whose names start with `.`, when restoring."),
+        /// If a file name is longer than 16 characters before its extension or holds characters other than printable ASCII, then the BC shall reject the request naming the file.
+        R3_10("R3.10", "If a file name is longer than 16 characters before its extension or holds characters other than printable ASCII, then the BC shall reject the request naming the file."),
+        /// If two files of a partition or floppy map to the same uppercase name, then the BC shall reject the request naming them.
+        R3_11("R3.11", "If two files of a partition or floppy map to the same uppercase name, then the BC shall reject the request naming them."),
+        /// If the files of a partition or floppy need more clusters or directory entries than it has, then the BC shall reject the request naming it with the space needed and available.
+        R3_12("R3.12", "If the files of a partition or floppy need more clusters or directory entries than it has, then the BC shall reject the request naming it with the space needed and available."),
+        /// If a subfolder is not named `MPC-PART--A` … `MPC-PART--W`, or MPC files lie next to partition folders, then the BC shall reject the request naming them.
+        R3_13("R3.13", "If a subfolder is not named `MPC-PART--A` … `MPC-PART--W`, or MPC files lie next to partition folders, then the BC shall reject the request naming them."),
+        /// If the folder does not exist or holds no MPC files, then the BC shall reject the request.
+        R3_14("R3.14", "If the folder does not exist or holds no MPC files, then the BC shall reject the request.");
 
         private final String id;
         private final String statement;

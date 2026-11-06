@@ -1,6 +1,7 @@
 package christianfrei.mpc3000.image.entity;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,27 @@ public record DirectoryEntry(String name, String extension, int attributes, int 
 
     public FileType type() {
         return FileType.of(extension);
+    }
+
+    /// The MPC3000 leaves dates and times empty and fills the name tail only for names longer than 8 characters
+    public static byte[] encode(String name, String extension, int firstCluster, long size) {
+        var entry = ByteBuffer.allocate(LENGTH).order(ByteOrder.LITTLE_ENDIAN);
+        entry.put(0, padded(name, 8)).put(8, padded(extension, 3));
+        if (name.length() > 8)
+            entry.put(NAME_TAIL, padded(name.substring(8), 8));
+        entry.putShort(26, (short) firstCluster).putInt(28, (int) size);
+        return entry.array();
+    }
+
+    /// A volume label spans name and extension
+    public static byte[] label(String label) {
+        var entry = ByteBuffer.allocate(LENGTH);
+        entry.put(0, padded(label, 11)).put(11, (byte) VOLUME_LABEL);
+        return entry.array();
+    }
+
+    static byte[] padded(String text, int length) {
+        return ("%-" + length + "s").formatted(text).substring(0, length).getBytes(StandardCharsets.US_ASCII);
     }
 
     static String text(ByteBuffer buffer, int offset, int length) {

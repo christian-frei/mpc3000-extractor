@@ -1,9 +1,10 @@
 /// # Image
-/// > Read the partitions and files of AKAI MPC3000 disk images and copy them to the host.
+/// > Read the partitions and files of AKAI MPC3000 disk images, copy them to the host, and write host folders back into new images.
 ///
 /// ## Boundary
 /// - `list-image` — report the partitions of an image and the files on each
 /// - `extract-image` — copy the files of every partition holding sounds into host folders
+/// - `restore-image` — write a host folder into a new hard disk or floppy image
 ///
 /// ## Requirements
 /// ### R1: List an image
@@ -26,11 +27,28 @@
 /// - R2.9 — If a file's cluster chain ends before its size is reached, then the BC shall reject the extraction naming the file.
 /// - R2.10 — When an unpartitioned floppy image without volume label is extracted, the BC shall write its files into a folder named after the image without its extension, inside the target folder or, without a target folder, in the current directory. _(why: several floppies extracted into one target must not overwrite each other)_
 ///
+/// ### R3: Restore an image
+/// - R3.1 — When a folder of partition folders is restored, the BC shall write a hard disk image with the MPC3000's 23-partition layout (`MPC-PART--A` … `MPC-PART--W`, 64,260 sectors per partition, 779,091,968 bytes), putting each folder's files into the partition of the same label and leaving the other partitions empty. _(why: the layout of a disk the MPC3000 formatted and used)_
+/// - R3.2 — When a folder of files is restored, the BC shall write a 1.44 MB floppy image holding them.
+/// - R3.3 — When an image is restored, the BC shall write partition table, boot sectors, FATs and directory entries in the MPC3000's own layout: no boot code, no timestamps, 16-character names, the first file at cluster 4 on hard disk partitions and at cluster 2 on floppies. _(why: byte-identical to what the MPC3000 writes, so the MPC3000 accepts the image)_
+/// - R3.4 — When an image is restored, the BC shall store every file contiguously in name order with its content unchanged, so that extracting the image yields the same files.
+/// - R3.5 — When a file name contains lowercase letters, the BC shall store it in uppercase. _(why: the MPC3000 writes uppercase names only)_
+/// - R3.6 — When no image name is given, the BC shall write `<folder name>.iso` for a hard disk or `<folder name>.img` for a floppy next to the folder.
+/// - R3.7 — If the image file already exists, then the BC shall reject the request without touching the file.
+/// - R3.8 — If a folder holds files that are not MPC files (`SND`, `PGM`, `SEQ`, `ALL`, `APS`), then the BC shall leave them out of the image and list them.
+/// - R3.9 — The BC shall ignore hidden files and folders, whose names start with `.`, when restoring. _(why: macOS adds `.DS_Store` and `._` files to folders)_
+/// - R3.10 — If a file name is longer than 16 characters before its extension or holds characters other than printable ASCII, then the BC shall reject the request naming the file.
+/// - R3.11 — If two files of a partition or floppy map to the same uppercase name, then the BC shall reject the request naming them.
+/// - R3.12 — If the files of a partition or floppy need more clusters or directory entries than it has, then the BC shall reject the request naming it with the space needed and available.
+/// - R3.13 — If a subfolder is not named `MPC-PART--A` … `MPC-PART--W`, or MPC files lie next to partition folders, then the BC shall reject the request naming them.
+/// - R3.14 — If the folder does not exist or holds no MPC files, then the BC shall reject the request.
+///
 /// ## Entities
-/// - Volume, PartitionEntry, BootSector, DirectoryEntry, Fat, FileType, ExtractedPartition
+/// - Volume, PartitionEntry, BootSector, DirectoryEntry, Fat, FileType, ExtractedPartition, VolumeFormat, DiskLayout, RestoredFile, RestoredVolume, RestoredImage
 ///
 /// ## Out of scope
 /// - Converting sounds to other audio formats
-/// - Writing images from host folders (restore)
+/// - 720 KB double-density floppy images and hard disk layouts other than the 23-partition one
+/// - Writing images onto physical floppies or SCSI devices
 /// - Subdirectories and recovery of deleted files
 package christianfrei.mpc3000.image;
