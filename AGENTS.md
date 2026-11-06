@@ -6,7 +6,7 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 
 - No dashed options: commands are `list`, `extract`, `convert`, `help`, `version`, arguments are positional; no arguments shows help
 - `mpc3000 list <image>` — list partitions and files of an image
-- `mpc3000 extract <image> [<folder>]` — one subfolder per partition containing sounds (`SND`), named after its label, holding all files of that partition; without a folder argument `./<image name without extension>` is used; a given folder is created or added to; existing files are replaced
+- `mpc3000 extract <image> [<folder>]` — one subfolder per partition containing sounds (`SND`), named after its label, holding all files of that partition; an unlabeled floppy gets a folder named after the image instead; without a folder argument `./<image name without extension>` is used; a given folder is created or added to; existing files are replaced
 - `mpc3000 convert <snd|folder> [<folder>]` — every `SND` below a folder (or one file) → 16-bit mono 44.1 kHz `WAV`, whole sample, start point as `cue`, loop as `smpl`; next to each SND or mirrored into folder; failed files are listed, the rest converted, exit code 1
 
 ## Roadmap
@@ -22,7 +22,7 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 - Base package `christianfrei.mpc3000`; `App` parses argv and dispatches to BC boundaries
 - System doc (decisions, stack): `src/main/java/christianfrei/mpc3000/package-info.java`
 - Each BC's spec is its `package-info.java` (`/sbce` format): `## Boundary` ops, `## Requirements` as EARS statements with stable ids `Rn.m`, `## Entities`, `## Out of scope`
-- `Requirement.java` per BC is generated from the spec (one `Rn` constant per statement) — regenerate, never hand-edit
+- `Requirement.java` per BC is generated from the spec (one `Rn` constant per statement) by `tools/requirements <bc-folder>...` — regenerate, never hand-edit
 - New behaviour starts as an EARS statement in the spec; never renumber ids, retire removed ones
 
 ## Build and test
@@ -33,12 +33,14 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 - WAV tests read files back with `javax.sound.sampled.AudioSystem` (import the class, not `module java.desktop` — `java.awt.List` clashes)
 - `src/test/java/FatImage.java` builds synthetic FAT12 floppy and partitioned images, `src/test/java/SndFile.java` builds SND files and reads WAV chunks, so EARS tests need no real image
 - `src/test/java/Hd0ImageTest.java` and `src/test/java/Hd0SoundTest.java` are regression tests against `src/test/resources/HD0.iso` (git-ignored, skipped when absent); image checksums come from an independent FAT12 reader, all 165 sounds must convert
+- `src/test/java/Floppy01ImageTest.java` is a regression test against `src/test/resources/FLOPPY01.img` (a real floppy, git-ignored, skipped when absent); checksums come from the macOS FAT driver reading the mounted disk
 
 ## Image format
 
 - Hard disk images: MBR with an extended partition (type `0x05`) chaining logical FAT12 partitions (type `0x01`), each ~32 MB, labeled `MPC-PART--A`, `MPC-PART--B`, ...
-- Floppy images: a single raw FAT12 volume without partition table
-- FAT12 boot sector carries OEM name `MPC-3000`; root directory is flat, no dates; files can be fragmented (follow the FAT chain)
+- Floppy images: a single raw FAT12 volume without partition table, 1.44 MB (2880 sectors); no volume label and an empty OEM name (boot sector starts `EB 34 90` followed by zeros)
+- Hard disk partitions carry OEM name `MPC-3000` and labels `MPC-PART--A`…; root directory is flat, no dates; files can be fragmented (follow the FAT chain)
+- macOS mounts MPC floppies read-write and writes `.fseventsd` onto them; its FAT driver shows only 8.3 names (`PROGRAM_.pgm` for `PROGRAM_01.PGM`) — always read the raw device
 - MPC names have 16 characters: bytes 0–7 of the directory entry plus bytes 12–19 (`11042026` + `B` → `11042026B.PGM`); ignoring the tail produces duplicate names
 - The first character may be a variant prefix and is not always a letter (`AOUND298`, `(OUND038`) — only replace characters reserved in host file names
 - File types by extension: `SND` sound, `PGM` program, `SEQ` sequence, `ALL` all sequences and songs, `APS` all programs and sounds
@@ -48,6 +50,6 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 
 ## Workflow
 
-- Test image: `src/test/resources/HD0.iso`: 23 partitions, A–F hold 203 files
+- Test images: `src/test/resources/HD0.iso` (23 partitions, A–F hold 203 files), `src/test/resources/FLOPPY01.img` (15 files, 13 sounds)
 - Never extract into the repo; use a temp folder
 - Git: commit often using conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`)
