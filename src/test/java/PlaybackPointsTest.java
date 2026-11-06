@@ -41,7 +41,9 @@ void main() throws Exception {
     for (var c : cases) {
         try {
             c.check().run();
-        } catch (Exception e) {
+        } catch (Exception | AssertionError e) {
+            if (e instanceof AssertionError && String.valueOf(e.getMessage()).startsWith(c.req().toString()))
+                throw e;
             throw new AssertionError("%s — %s".formatted(c.req(), c.req().statement()), e);
         }
     }
