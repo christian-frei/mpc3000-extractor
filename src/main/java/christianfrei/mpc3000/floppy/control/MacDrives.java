@@ -3,6 +3,7 @@ package christianfrei.mpc3000.floppy.control;
 import christianfrei.mpc3000.floppy.entity.Disk;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,10 +16,10 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 
-/// Disks via `diskutil`; copies via `dd` behind the macOS administrator password dialog
+/// Disks via `diskutil`; copies via `dd` run by `sudo`, which asks for the password in the terminal
 public record MacDrives() implements Drives {
 
-    static final String CANCELLED = "(-128)";
+    static final String PROMPT = "mpc3000: administrator password for %u to read the floppy: ";
 
     @Override
     public List<Disk> externalDisks() throws IOException {
@@ -28,20 +29,28 @@ public record MacDrives() implements Drives {
         return disks(result.output());
     }
 
+    /// sudo reads the password from the controlling terminal, which only exists when run from one
+    @Override
+    public boolean canAskForPassword() {
+        try (var terminal = new RandomAccessFile("/dev/tty", "r")) {
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /// The shell command always exits 0, so a failing exit status comes from sudo itself
     @Override
     public String copy(Disk disk, Path image) throws IOException {
-        var result = run(copyCommand(disk, image, System.getProperty("user.name")));
-        if (result.exitCode() != 0 && result.output().contains(CANCELLED))
-            throw new CancellationException("administrator password dialog cancelled");
+        var result = runInTerminal(copyCommand(disk, image, System.getProperty("user.name")));
         if (result.exitCode() != 0)
-            throw new IOException("copy failed: " + result.output().strip());
+            throw new CancellationException("administrator password prompt cancelled or failed");
         return ddOutput(result.output(), image);
     }
 
-    /// AppleScript only elevates; the shell command travels as an argument, never spliced into the script
+    /// sudo runs the copy inside the terminal app, which macOS lets read removable disks
     public static List<String> copyCommand(Disk disk, Path image, String user) {
-        return List.of("osascript", "-e", "on run argv", "-e", "do shell script (item 1 of argv) with administrator privileges", "-e", "end run",
-                shellCommand(disk.rawDevice(), image, user));
+        return List.of("sudo", "-p", PROMPT, "/bin/sh", "-c", shellCommand(disk.rawDevice(), image, user));
     }
 
     /// Reads device into image with dd, makes user the owner when an image was written, and always succeeds,
@@ -108,8 +117,20 @@ public record MacDrives() implements Drives {
 
     record Result(int exitCode, String output) {}
 
+    /// Shares the terminal for sudo's prompt and messages; captures only standard output
+    static Result runInTerminal(List<String> command) throws IOException {
+        var process = new ProcessBuilder(command)
+                .redirectInput(ProcessBuilder.Redirect.INHERIT)
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .start();
+        return result(process, command);
+    }
+
     static Result run(List<String> command) throws IOException {
-        var process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        return result(new ProcessBuilder(command).redirectErrorStream(true).start(), command);
+    }
+
+    static Result result(Process process, List<String> command) throws IOException {
         var output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         try {
             return new Result(process.waitFor(), output);

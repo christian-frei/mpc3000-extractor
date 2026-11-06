@@ -31,12 +31,14 @@ public @interface Requirement {
         R1_7("R1.7", "If the image file already exists, then the BC shall reject the request without touching the file."),
         /// If sectors of the disk cannot be read, then the BC shall fill them with zeros, copy the remaining sectors, keep the image and report the read as failed with the number of unreadable sectors.
         R1_8("R1.8", "If sectors of the disk cannot be read, then the BC shall fill them with zeros, copy the remaining sectors, keep the image and report the read as failed with the number of unreadable sectors."),
-        /// If the administrator password dialog is cancelled, then the BC shall reject the request and leave no image file behind.
-        R1_9("R1.9", "If the administrator password dialog is cancelled, then the BC shall reject the request and leave no image file behind."),
+        /// If the administrator password prompt is cancelled or fails, then the BC shall reject the request and leave no image file behind.
+        R1_9("R1.9", "If the administrator password prompt is cancelled or fails, then the BC shall reject the request and leave no image file behind."),
         /// When the image is written, the BC shall make the current user its owner.
         R1_10("R1.10", "When the image is written, the BC shall make the current user its owner."),
         /// If the disk cannot be copied at all, then the BC shall report the reason given by the copy tool and leave no image file behind.
-        R1_11("R1.11", "If the disk cannot be copied at all, then the BC shall report the reason given by the copy tool and leave no image file behind.");
+        R1_11("R1.11", "If the disk cannot be copied at all, then the BC shall report the reason given by the copy tool and leave no image file behind."),
+        /// If no terminal is available to ask for the administrator password, then the BC shall reject the request before copying and ask for it to be run in a terminal.
+        R1_12("R1.12", "If no terminal is available to ask for the administrator password, then the BC shall reject the request before copying and ask for it to be run in a terminal.");
 
         private final String id;
         private final String statement;

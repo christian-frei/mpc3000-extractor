@@ -10,7 +10,10 @@ public interface Drives {
 
     List<Disk> externalDisks() throws IOException;
 
+    /// Whether the administrator password can be asked for
+    boolean canAskForPassword();
+
     /// Copies the disk into image, a file that does not exist yet, and returns the copy tool's output
-    /// @throws java.util.concurrent.CancellationException when the user cancels the administrator password dialog
+    /// @throws java.util.concurrent.CancellationException when the administrator password prompt is cancelled or fails
     String copy(Disk disk, Path image) throws IOException;
 }

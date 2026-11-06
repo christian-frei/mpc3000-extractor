@@ -39,6 +39,11 @@ static class FakeDrives implements Drives {
     }
 
     @Override
+    public boolean canAskForPassword() {
+        return true;
+    }
+
+    @Override
     public String copy(Disk disk, Path image) throws IOException {
         copied = disk;
         Files.write(image, content);
@@ -157,6 +162,19 @@ void main() throws Exception {
                 var reason = rejection(IOException.class, () -> Floppies.read(Optional.empty(), folder, failing, _ -> {}));
                 assertContains(R1_11, reason, "Operation not permitted");
                 assert !Files.exists(folder.resolve("FLOPPY01.img")) : R1_11 + " — " + R1_11.statement() + " — image left behind";
+            }),
+            new Case(R1_12, () -> {
+                var folder = Files.createTempDirectory("mpc3000-");
+                var noTerminal = new FakeDrives(List.of(new Disk("disk9", content.length)), content, "", false) {
+                    @Override
+                    public boolean canAskForPassword() {
+                        return false;
+                    }
+                };
+                var message = rejection(IllegalArgumentException.class, () -> Floppies.read(Optional.empty(), folder, noTerminal, _ -> {}));
+                assertContains(R1_12, message, "in a terminal");
+                assert noTerminal.copied == null : R1_12 + " — " + R1_12.statement() + " — copied without a terminal";
+                assertContains(R1_12, String.join(" ", MacDrives.copyCommand(new Disk("disk9", 1_474_560), folder.resolve("X.img"), "duke")), "sudo -p ");
             }));
 
     for (var c : cases) {

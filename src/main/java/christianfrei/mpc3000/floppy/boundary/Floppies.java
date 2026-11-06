@@ -25,19 +25,21 @@ public interface Floppies {
     }
 
     /// @throws IOException after the image is written when sectors could not be read
-    @Requirement({R1_1, R1_2, R1_3, R1_4, R1_5, R1_6, R1_7, R1_8, R1_9, R1_10, R1_11})
+    @Requirement({R1_1, R1_2, R1_3, R1_4, R1_5, R1_6, R1_7, R1_8, R1_9, R1_10, R1_11, R1_12})
     static void read(Optional<Path> image, Path folder, Drives drives, Consumer<String> output) throws IOException {
         var disk = floppy(drives.externalDisks());
         var target = image.orElseGet(() -> ImageFiles.nextFree(folder));
         if (Files.exists(target))
             throw new IllegalArgumentException("already exists, not overwritten: " + target);
-        output.accept("reading %s (%,d bytes) into %s — confirm the administrator password dialog".formatted(disk.rawDevice(), disk.size(), target));
+        if (!drives.canAskForPassword())
+            throw new IllegalArgumentException("run floppy-read in a terminal: sudo asks for the administrator password there");
+        output.accept("reading %s (%,d bytes) into %s — enter your administrator password if asked".formatted(disk.rawDevice(), disk.size(), target));
         String copyOutput;
         try {
             copyOutput = drives.copy(disk, target);
         } catch (CancellationException e) {
             Files.deleteIfExists(target);
-            throw new IllegalArgumentException("cancelled, no image written");
+            throw new IllegalArgumentException("password prompt cancelled or failed, no image written");
         } catch (IOException e) {
             Files.deleteIfExists(target);
             throw e;
