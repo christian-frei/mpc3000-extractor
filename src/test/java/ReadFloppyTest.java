@@ -61,10 +61,14 @@ void main() throws Exception {
                 Floppies.read(Optional.empty(), folder, drives, output::add);
                 assert Arrays.equals(Files.readAllBytes(folder.resolve("FLOPPY01.img")), content) : R1_1 + " — " + R1_1.statement() + " — image differs";
                 assertContains(R1_1, String.join("\n", output), "1,474,560 bytes");
-                var command = String.join(" ", MacDrives.copyCommand(new Disk("disk9", 1_474_560), folder.resolve("X.img"), "duke"));
-                assertContains(R1_1, command, "if=\" & quoted form of (item 1 of argv)");
-                assertContains(R1_1, command, "/dev/rdisk9");
-                assert !command.contains("of=/dev") : R1_1 + " — " + R1_1.statement() + " — writes to a device: " + command;
+                var device = Files.write(folder.resolve("device's copy"), content);
+                var image = folder.resolve("COPY 'A'.img");
+                MacDrives.ddOutput(shell(MacDrives.shellCommand(device.toString(), image, user())), image);
+                assert Arrays.equals(Files.readAllBytes(image), content) : R1_1 + " — " + R1_1.statement() + " — dd copy differs";
+                assert Arrays.equals(Files.readAllBytes(device), content) : R1_1 + " — " + R1_1.statement() + " — source changed";
+                var command = MacDrives.copyCommand(new Disk("disk9", 1_474_560), image, "duke").getLast();
+                assertContains(R1_1, command, "if='/dev/rdisk9'");
+                assert !command.contains("of='/dev") : R1_1 + " — " + R1_1.statement() + " — writes to a device: " + command;
             }),
             new Case(R1_2, () -> {
                 var folder = Files.createTempDirectory("mpc3000-");
@@ -130,10 +134,29 @@ void main() throws Exception {
                 assert !Files.exists(folder.resolve("FLOPPY01.img")) : R1_9 + " — " + R1_9.statement() + " — image left behind";
             }),
             new Case(R1_10, () -> {
-                var command = MacDrives.copyCommand(new Disk("disk9", 1_474_560), Path.of("/tmp/FLOPPY01.img"), "duke");
-                var script = String.join(" ", command);
-                assertContains(R1_10, script, "/usr/sbin/chown \" & quoted form of (item 3 of argv)");
-                assert command.getLast().equals("duke") : "%s — %s — owner argument %s".formatted(R1_10, R1_10.statement(), command.getLast());
+                var folder = Files.createTempDirectory("mpc3000-");
+                var device = Files.write(folder.resolve("device"), content);
+                var image = folder.resolve("FLOPPY01.img");
+                MacDrives.ddOutput(shell(MacDrives.shellCommand(device.toString(), image, user())), image);
+                var owner = Files.getOwner(image).getName();
+                assert owner.equals(user()) : "%s — %s — owner %s".formatted(R1_10, R1_10.statement(), owner);
+                assertContains(R1_10, MacDrives.copyCommand(new Disk("disk9", 1_474_560), image, "duke").getLast(), "/usr/sbin/chown 'duke'");
+            }),
+            new Case(R1_11, () -> {
+                var folder = Files.createTempDirectory("mpc3000-");
+                var image = folder.resolve("FLOPPY01.img");
+                var message = rejection(IOException.class, () -> MacDrives.ddOutput(shell(MacDrives.shellCommand(folder.resolve("no-device").toString(), image, user())), image));
+                assertContains(R1_11, message, "No such file or directory");
+                var failing = new FakeDrives(List.of(new Disk("disk9", content.length)), content, "", false) {
+                    @Override
+                    public String copy(Disk disk, Path target) throws IOException {
+                        Files.write(target, new byte[512]);
+                        throw new IOException("copy failed: dd: /dev/rdisk9: Operation not permitted");
+                    }
+                };
+                var reason = rejection(IOException.class, () -> Floppies.read(Optional.empty(), folder, failing, _ -> {}));
+                assertContains(R1_11, reason, "Operation not permitted");
+                assert !Files.exists(folder.resolve("FLOPPY01.img")) : R1_11 + " — " + R1_11.statement() + " — image left behind";
             }));
 
     for (var c : cases) {
@@ -145,6 +168,18 @@ void main() throws Exception {
             throw new AssertionError("%s — %s".formatted(c.req(), c.req().statement()), e);
         }
     }
+}
+
+/// Runs a shell command unprivileged, the way the password dialog runs it elevated
+String shell(String command) throws Exception {
+    var process = new ProcessBuilder("/bin/sh", "-c", command).redirectErrorStream(true).start();
+    var output = new String(process.getInputStream().readAllBytes());
+    assert process.waitFor() == 0 : "shell command failed: " + output;
+    return output;
+}
+
+String user() {
+    return System.getProperty("user.name");
 }
 
 void assertContains(Requirement.Rn req, String actual, String expected) {

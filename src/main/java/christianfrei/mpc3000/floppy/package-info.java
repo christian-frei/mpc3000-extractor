@@ -16,6 +16,7 @@
 /// - R1.8 — If sectors of the disk cannot be read, then the BC shall fill them with zeros, copy the remaining sectors, keep the image and report the read as failed with the number of unreadable sectors. _(why: old floppies develop bad sectors; a partial image still saves the readable files)_
 /// - R1.9 — If the administrator password dialog is cancelled, then the BC shall reject the request and leave no image file behind.
 /// - R1.10 — When the image is written, the BC shall make the current user its owner. _(why: the copy runs with administrator rights, which would leave a root-owned file)_
+/// - R1.11 — If the disk cannot be copied at all, then the BC shall report the reason given by the copy tool and leave no image file behind. _(why: a failed first run surfaced only a follow-up error, hiding the cause)_
 ///
 /// ## Entities
 /// - Disk, CopyReport

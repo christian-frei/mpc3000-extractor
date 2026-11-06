@@ -25,7 +25,7 @@ public interface Floppies {
     }
 
     /// @throws IOException after the image is written when sectors could not be read
-    @Requirement({R1_1, R1_2, R1_3, R1_4, R1_5, R1_6, R1_7, R1_8, R1_9, R1_10})
+    @Requirement({R1_1, R1_2, R1_3, R1_4, R1_5, R1_6, R1_7, R1_8, R1_9, R1_10, R1_11})
     static void read(Optional<Path> image, Path folder, Drives drives, Consumer<String> output) throws IOException {
         var disk = floppy(drives.externalDisks());
         var target = image.orElseGet(() -> ImageFiles.nextFree(folder));
@@ -38,6 +38,9 @@ public interface Floppies {
         } catch (CancellationException e) {
             Files.deleteIfExists(target);
             throw new IllegalArgumentException("cancelled, no image written");
+        } catch (IOException e) {
+            Files.deleteIfExists(target);
+            throw e;
         }
         var report = CopyReport.of(copyOutput, Files.size(target));
         output.accept("wrote %s, %,d bytes".formatted(target, report.bytes()));

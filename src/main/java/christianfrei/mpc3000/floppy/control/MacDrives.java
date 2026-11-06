@@ -4,6 +4,7 @@ import christianfrei.mpc3000.floppy.entity.Disk;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,17 +35,37 @@ public record MacDrives() implements Drives {
             throw new CancellationException("administrator password dialog cancelled");
         if (result.exitCode() != 0)
             throw new IOException("copy failed: " + result.output().strip());
-        return result.output();
+        return ddOutput(result.output(), image);
     }
 
-    /// Paths and user travel as AppleScript arguments and are shell-quoted by `quoted form of`, never spliced into the script
+    /// AppleScript only elevates; the shell command travels as an argument, never spliced into the script
     public static List<String> copyCommand(Disk disk, Path image, String user) {
-        var script = """
-                do shell script "/bin/dd if=" & quoted form of (item 1 of argv) & " of=" & quoted form of (item 2 of argv) \
-                & " bs=512 conv=noerror,sync 2>&1; /usr/sbin/chown " & quoted form of (item 3 of argv) \
-                & " " & quoted form of (item 2 of argv) with administrator privileges""";
-        return List.of("osascript", "-e", "on run argv", "-e", script, "-e", "end run",
-                disk.rawDevice(), image.toAbsolutePath().normalize().toString(), user);
+        return List.of("osascript", "-e", "on run argv", "-e", "do shell script (item 1 of argv) with administrator privileges", "-e", "end run",
+                shellCommand(disk.rawDevice(), image, user));
+    }
+
+    /// Reads device into image with dd, makes user the owner when an image was written, and always succeeds,
+    /// printing dd's output followed by `exit <status>` — a failing last command would hide dd's own messages
+    public static String shellCommand(String device, Path image, String user) {
+        var target = quoted(image.toAbsolutePath().normalize().toString());
+        return "out=$(/bin/dd if=%s of=%s bs=512 conv=noerror,sync 2>&1); status=$?; if [ -f %s ]; then /usr/sbin/chown %s %s; fi; echo \"$out\"; echo \"exit $status\""
+                .formatted(quoted(device), target, target, quoted(user), target);
+    }
+
+    /// dd's output without the trailing exit line
+    /// @throws IOException with dd's messages when no image was written
+    public static String ddOutput(String shellOutput, Path image) throws IOException {
+        var lines = shellOutput.strip().lines().toList();
+        var status = lines.isEmpty() ? "" : lines.getLast();
+        var output = String.join("\n", lines.isEmpty() ? lines : lines.subList(0, lines.size() - 1));
+        if (!Files.exists(image))
+            throw new IOException("copy failed (%s): %s".formatted(status, output.strip()));
+        return output;
+    }
+
+    /// Single-quotes for the shell; an embedded quote becomes '\''
+    static String quoted(String text) {
+        return "'" + text.replace("'", "'\\''") + "'";
     }
 
     /// Reads `DeviceIdentifier` and `Size` of each whole disk from `diskutil list -plist` output
