@@ -37,7 +37,7 @@ mpc3000 format blank.img floppy   # empty 1.44 MB floppy
 - `convert` writes 16-bit mono 44.1 kHz WAVs holding the whole sample, with the start point as a `cue` marker and the loop as a `smpl` loop; unreadable files are listed and fail the command.
 - `restore` turns a folder of partition folders (`MPC-PART--A` … `MPC-PART--W`) into a hard disk image and a folder of files into a floppy image. It uppercases names, leaves out and lists files that are not MPC files, and ignores hidden files like `.DS_Store`.
 - `format` writes empty images. ZuluSCSI starts from blank image files, which the MPC3000 rejects until they are formatted.
-- `restore`, `format` and the image commands write the partition table, boot sectors and FATs byte for byte like the MPC3000 disk they were checked against; the MPC3000 loads the results.
+- `restore` and `format` write the partition table, boot sectors and FATs byte for byte like a working MPC3000 hard disk image; the MPC3000 loads the images they write.
 - No command overwrites an existing image. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
 
 ## Test
