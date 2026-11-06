@@ -43,6 +43,8 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 - Floppy images: a single raw FAT12 volume without partition table, 1.44 MB (2880 sectors); no volume label and an empty OEM name (boot sector starts `EB 34 90` followed by zeros)
 - Hard disk partitions carry OEM name `MPC-3000` and labels `MPC-PART--A`…; root directory is flat, no dates; files can be fragmented (follow the FAT chain)
 - macOS mounts MPC floppies read-write and writes `.fseventsd` onto them; its FAT driver shows only 8.3 names (`PROGRAM_.pgm` for `PROGRAM_01.PGM`) — always read the raw device
+- macOS keeps changing a mounted MPC floppy (root directory sector 20 and `.fseventsd` data changed between two reads on 2026-11-06)
+- BSD/macOS `dd` with `conv=noerror` prints each read error twice and a summary after every error; count unreadable blocks from the last `N+M records in` (M), never from `dd:` lines
 - MPC names have 16 characters: bytes 0–7 of the directory entry plus bytes 12–19 (`11042026` + `B` → `11042026B.PGM`); ignoring the tail produces duplicate names
 - The first character may be a variant prefix and is not always a letter (`AOUND298`, `(OUND038`) — only replace characters reserved in host file names
 - File types by extension: `SND` sound, `PGM` program, `SEQ` sequence, `ALL` all sequences and songs, `APS` all programs and sounds
