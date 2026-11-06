@@ -4,9 +4,10 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 
 ## Commands
 
-- No dashed options: commands are `list`, `extract`, `convert`, `help`, `version`, arguments are positional; no arguments shows help
+- No dashed options: commands are `list`, `extract`, `convert`, `floppy-read`, `help`, `version`, arguments are positional; no arguments shows help
 - `mpc3000 list <image>` — list partitions and files of an image
 - `mpc3000 extract <image> [<folder>]` — one subfolder per partition containing sounds (`SND`), named after its label, holding all files of that partition; an unlabeled floppy gets a folder named after the image instead; without a folder argument `./<image name without extension>` is used; a given folder is created or added to; existing files are replaced
+- `mpc3000 floppy-read [<image>]` — copy the floppy in the USB drive (auto-detected: the one external disk of 1.44 MB or 720 KB) into an image file, by default the lowest free `./FLOPPYnn.img`; never overwrites; admin rights via the macOS password dialog (`osascript … with administrator privileges` running `dd` + `chown`), the disk stays mounted; bad sectors are zero-filled, counted, exit code 1
 - `mpc3000 convert <snd|folder> [<folder>]` — every `SND` below a folder (or one file) → 16-bit mono 44.1 kHz `WAV`, whole sample, start point as `cue`, loop as `smpl`; next to each SND or mirrored into folder; failed files are listed, the rest converted, exit code 1
 
 ## Roadmap
@@ -14,6 +15,7 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 1. `list` — done
 2. `extract` — done
 3. `convert` — done (`sound` BC)
+3b. `floppy-read` — done (`floppy` BC, macOS only)
 4. `restore` — write host folders (one per partition) back into a new MPC3000 image file; extends the `image` BC (decision D2), verified by a round trip extract → restore → extract
 5. later: `../zaudioconvert` reuses the `sound` BC from this project's JAR instead of duplicating the SND parser
 
@@ -29,7 +31,7 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 
 - Build: `zb.sh` (installed in `~/bin`) → `zbo/app.jar`; `./mpc3000` is a launcher for it
 - Test: `zunit` runs `src/test/java/*Test.java` against `zbo/app.jar`
-- One test file per requirement group (`image`: `ListImageTest` ↔ R1, `ExtractImageTest` ↔ R2; `sound`: `ConvertSoundsTest` ↔ R1, `PlaybackPointsTest` ↔ R2), one `Case` row per statement id; spec ids and rows stay bijective
+- One test file per requirement group (`image`: `ListImageTest` ↔ R1, `ExtractImageTest` ↔ R2; `sound`: `ConvertSoundsTest` ↔ R1, `PlaybackPointsTest` ↔ R2; `floppy`: `ReadFloppyTest` ↔ R1 with a fake `Drives`), one `Case` row per statement id; spec ids and rows stay bijective
 - WAV tests read files back with `javax.sound.sampled.AudioSystem` (import the class, not `module java.desktop` — `java.awt.List` clashes)
 - `src/test/java/FatImage.java` builds synthetic FAT12 floppy and partitioned images, `src/test/java/SndFile.java` builds SND files and reads WAV chunks, so EARS tests need no real image
 - `src/test/java/Hd0ImageTest.java` and `src/test/java/Hd0SoundTest.java` are regression tests against `src/test/resources/HD0.iso` (git-ignored, skipped when absent); image checksums come from an independent FAT12 reader, all 165 sounds must convert
@@ -51,5 +53,5 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 ## Workflow
 
 - Test images: `src/test/resources/HD0.iso` (23 partitions, A–F hold 203 files), `src/test/resources/FLOPPY01.img` (15 files, 13 sounds)
-- Never extract into the repo; use a temp folder
+- Never extract into the repo; use a temp folder; when trying `floppy-read`, pass `src/test/resources/<name>.img` (git-ignored) instead of defaulting to the repo root
 - Git: commit often using conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`)

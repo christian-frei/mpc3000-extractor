@@ -1,6 +1,6 @@
 # mpc3000
 
-Lists and extracts the files on AKAI MPC3000 hard disk and floppy images and converts MPC3000 sounds to WAV. A zero-dependency Java 25 CLI app; restoring folders into new images is planned.
+Copies MPC3000 floppies from a USB floppy drive into image files, lists and extracts the files on AKAI MPC3000 hard disk and floppy images, and converts MPC3000 sounds to WAV. A zero-dependency Java 25 CLI app; restoring folders into new images is planned.
 
 ## Prerequisites
 
@@ -18,6 +18,7 @@ sudo ln -s $(pwd)/mpc3000 /usr/local/bin/mpc3000
 ## Usage
 
 ```
+mpc3000 floppy-read               # floppy in the USB drive → ./FLOPPY01.img (next free number)
 mpc3000 list HD0.iso              # partitions, files, sizes, MPC file types
 mpc3000 extract HD0.iso           # into ./HD0/<partition label>/
 mpc3000 extract HD0.iso samples   # into ./samples/<partition label>/, created or added to
@@ -25,7 +26,7 @@ mpc3000 convert samples           # every SND below samples/ → WAV next to it
 mpc3000 convert samples wav       # mirrored into ./wav/
 ```
 
-`extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files. `convert` writes 16-bit mono 44.1 kHz WAVs holding the whole sample, with the MPC start point as a `cue` marker and the loop as a `smpl` loop; files it cannot read are listed and the exit code is 1. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
+`floppy-read` finds the floppy drive on its own and asks for your administrator password in the macOS dialog; it never overwrites an image and fills unreadable sectors with zeros. `extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files; an unlabeled floppy gets a folder named after the image. `convert` writes 16-bit mono 44.1 kHz WAVs holding the whole sample, with the MPC start point as a `cue` marker and the loop as a `smpl` loop; files it cannot read are listed and the exit code is 1. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
 
 ## Test
 
@@ -33,7 +34,7 @@ mpc3000 convert samples wav       # mirrored into ./wav/
 zb.sh && zunit
 ```
 
-Requirements are EARS statements in the [image](src/main/java/christianfrei/mpc3000/image/package-info.java) and [sound](src/main/java/christianfrei/mpc3000/sound/package-info.java) specs; each statement id is one row in the tests.
+Requirements are EARS statements in the [image](src/main/java/christianfrei/mpc3000/image/package-info.java), [sound](src/main/java/christianfrei/mpc3000/sound/package-info.java) and [floppy](src/main/java/christianfrei/mpc3000/floppy/package-info.java) specs; each statement id is one row in the tests.
 
 ## Image Format
 
