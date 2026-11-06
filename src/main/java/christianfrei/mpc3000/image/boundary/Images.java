@@ -9,15 +9,18 @@ import christianfrei.mpc3000.image.control.Restoration;
 import christianfrei.mpc3000.image.control.Volumes;
 import christianfrei.mpc3000.image.entity.DirectoryEntry;
 import christianfrei.mpc3000.image.entity.ExtractedPartition;
+import christianfrei.mpc3000.image.entity.RestoredImage;
+import christianfrei.mpc3000.image.entity.RestoredVolume;
 import christianfrei.mpc3000.image.entity.Volume;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/// Lists, extracts and restores MPC3000 disk images; returns the report to print
+/// Lists, extracts, restores and formats MPC3000 disk images; returns the report to print
 public interface Images {
 
     @Requirement({R1_1, R1_2, R1_3, R1_4, R1_5, R1_6})
@@ -65,6 +68,16 @@ public interface Images {
                 .map(path -> "\n  " + path)
                 .collect(Collectors.joining("", "\nleft out (not MPC files):", ""));
         return lines + footer + (restored.leftOut().isEmpty() ? "" : leftOut);
+    }
+
+    @Requirement({R4_1, R4_2, R4_3})
+    static String format(Path image, boolean floppy) throws IOException {
+        if (Files.exists(image, LinkOption.NOFOLLOW_LINKS))
+            throw new IllegalArgumentException("image already exists: " + image);
+        var volumes = floppy ? List.of(new RestoredVolume("", List.of())) : List.<RestoredVolume>of();
+        ImageWriting.write(new RestoredImage(floppy, volumes, List.of()), image);
+        return "formatted %s: empty %s, %s".formatted(image.toAbsolutePath().normalize(),
+                floppy ? "1.44 MB floppy" : "hard disk with 23 partitions", human(Files.size(image)));
     }
 
     static Path existing(Path image) {

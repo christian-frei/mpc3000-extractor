@@ -1,10 +1,11 @@
 /// # Image
-/// > Read the partitions and files of AKAI MPC3000 disk images, copy them to the host, and write host folders back into new images.
+/// > Read the partitions and files of AKAI MPC3000 disk images, copy them to the host, write host folders back into new images, and create empty ones.
 ///
 /// ## Boundary
 /// - `list-image` — report the partitions of an image and the files on each
 /// - `extract-image` — copy the files of every partition holding sounds into host folders
 /// - `restore-image` — write a host folder into a new hard disk or floppy image
+/// - `format-image` — write a new, empty hard disk or floppy image
 ///
 /// ## Requirements
 /// ### R1: List an image
@@ -42,6 +43,11 @@
 /// - R3.12 — If the files of a partition or floppy need more clusters or directory entries than it has, then the BC shall reject the request naming it with the space needed and available.
 /// - R3.13 — If a subfolder is not named `MPC-PART--A` … `MPC-PART--W`, or MPC files lie next to partition folders, then the BC shall reject the request naming them.
 /// - R3.14 — If the folder does not exist or holds no MPC files, then the BC shall reject the request.
+///
+/// ### R4: Format an image
+/// - R4.1 — When a hard disk image is formatted, the BC shall write the MPC3000's 23-partition layout with every partition empty, identical to an image restored from no files. _(why: SCSI emulators such as ZuluSCSI start from blank image files, which the MPC3000 rejects)_
+/// - R4.2 — When a floppy image is formatted, the BC shall write an empty 1.44 MB floppy in the MPC3000's floppy layout.
+/// - R4.3 — If the image file already exists, then the BC shall reject the request without touching the file.
 ///
 /// ## Entities
 /// - Volume, PartitionEntry, BootSector, DirectoryEntry, Fat, FileType, ExtractedPartition, VolumeFormat, DiskLayout, RestoredFile, RestoredVolume, RestoredImage

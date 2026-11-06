@@ -12,7 +12,7 @@ import java.util.Optional;
 public interface App {
 
     String NAME = "mpc3000";
-    String VERSION = "2026-11-06.7";
+    String VERSION = "2026-11-06.8";
 
     record Invocation(String command, List<String> parameters) {
 
@@ -62,6 +62,11 @@ public interface App {
                 var image = parameters.size() == 2 ? Optional.of(Path.of(parameters.get(1))) : Optional.<Path>empty();
                 IO.println(Images.restore(Path.of(parameters.getFirst()), image));
             }
+            case "format" -> {
+                if (parameters.isEmpty() || parameters.size() > 2 || (parameters.size() == 2 && !parameters.get(1).equals("floppy")))
+                    throw new IllegalArgumentException("format expects an image file and optionally the word floppy");
+                IO.println(Images.format(Path.of(parameters.getFirst()), parameters.size() == 2));
+            }
             case "floppy-read" -> {
                 if (parameters.size() > 1)
                     throw new IllegalArgumentException("floppy-read expects an optional image file");
@@ -89,6 +94,8 @@ public interface App {
                   restore <folder> [<image>] Write a folder into a new image: partition folders MPC-PART--A…W
                                              make a hard disk (.iso), files alone a 1.44 MB floppy (.img);
                                              by default <folder>.iso or .img next to the folder
+                  format <image> [floppy]    Write a new, empty image: a 23-partition hard disk,
+                                             or a 1.44 MB floppy
                   floppy-read [<image>]      Copy the floppy in the USB drive into an image file,
                                              by default the next free ./FLOPPYnn.img
                   floppy-write <image>       Copy a floppy image onto the floppy in the USB drive,

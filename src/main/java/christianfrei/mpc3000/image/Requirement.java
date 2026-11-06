@@ -74,7 +74,13 @@ public @interface Requirement {
         /// If a subfolder is not named `MPC-PART--A` … `MPC-PART--W`, or MPC files lie next to partition folders, then the BC shall reject the request naming them.
         R3_13("R3.13", "If a subfolder is not named `MPC-PART--A` … `MPC-PART--W`, or MPC files lie next to partition folders, then the BC shall reject the request naming them."),
         /// If the folder does not exist or holds no MPC files, then the BC shall reject the request.
-        R3_14("R3.14", "If the folder does not exist or holds no MPC files, then the BC shall reject the request.");
+        R3_14("R3.14", "If the folder does not exist or holds no MPC files, then the BC shall reject the request."),
+        /// When a hard disk image is formatted, the BC shall write the MPC3000's 23-partition layout with every partition empty, identical to an image restored from no files.
+        R4_1("R4.1", "When a hard disk image is formatted, the BC shall write the MPC3000's 23-partition layout with every partition empty, identical to an image restored from no files."),
+        /// When a floppy image is formatted, the BC shall write an empty 1.44 MB floppy in the MPC3000's floppy layout.
+        R4_2("R4.2", "When a floppy image is formatted, the BC shall write an empty 1.44 MB floppy in the MPC3000's floppy layout."),
+        /// If the image file already exists, then the BC shall reject the request without touching the file.
+        R4_3("R4.3", "If the image file already exists, then the BC shall reject the request without touching the file.");
 
         private final String id;
         private final String statement;
