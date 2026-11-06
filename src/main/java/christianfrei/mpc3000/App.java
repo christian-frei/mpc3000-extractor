@@ -1,5 +1,6 @@
 package christianfrei.mpc3000;
 
+import christianfrei.mpc3000.floppy.boundary.Floppies;
 import christianfrei.mpc3000.image.boundary.Images;
 import christianfrei.mpc3000.sound.boundary.Sounds;
 import java.io.IOException;
@@ -11,7 +12,7 @@ import java.util.Optional;
 public interface App {
 
     String NAME = "mpc3000";
-    String VERSION = "2026-11-06.1";
+    String VERSION = "2026-11-06.2";
 
     record Invocation(String command, List<String> parameters) {
 
@@ -55,6 +56,11 @@ public interface App {
                 var target = parameters.size() == 2 ? Optional.of(Path.of(parameters.get(1))) : Optional.<Path>empty();
                 Sounds.convert(Path.of(parameters.getFirst()), target, IO::println);
             }
+            case "floppy-read" -> {
+                if (parameters.size() > 1)
+                    throw new IllegalArgumentException("floppy-read expects an optional image file");
+                Floppies.read(parameters.stream().findFirst().map(Path::of), IO::println);
+            }
             default -> throw new IllegalArgumentException("unknown command: " + invocation.command());
         }
     }
@@ -69,6 +75,8 @@ public interface App {
                   convert <snd|folder> [<folder>]
                                              Convert an SND file or all SND files below a folder to WAV,
                                              next to each SND or mirrored into folder
+                  floppy-read [<image>]      Copy the floppy in the USB drive into an image file,
+                                             by default the next free ./FLOPPYnn.img
                   help                       Show this help (default)
                   version                    Show version""".formatted(NAME));
     }
