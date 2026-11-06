@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 /// Lists and extracts MPC3000 disk images; returns the report to print
 public interface Images {
 
-    @Requirement({R1_1, R1_2, R1_3, R1_4, R1_5})
+    @Requirement({R1_1, R1_2, R1_3, R1_4, R1_5, R1_6})
     static String list(Path image) throws IOException {
         var volumes = Volumes.read(existing(image));
         var header = "%s: %d partition(s), %s".formatted(image.getFileName(), volumes.size(), human(Files.size(image)));
@@ -25,7 +25,7 @@ public interface Images {
                 .collect(Collectors.joining("\n", header + "\n", ""));
     }
 
-    @Requirement({R2_1, R2_2, R2_3, R2_4, R2_5, R2_6, R2_7, R2_8, R2_9})
+    @Requirement({R2_1, R2_2, R2_3, R2_4, R2_5, R2_6, R2_7, R2_8, R2_9, R2_10})
     static String extract(Path image, Path target) throws IOException {
         existing(image);
         if (Files.exists(target) && !Files.isDirectory(target))
@@ -38,11 +38,9 @@ public interface Images {
                 .collect(Collectors.joining("\n", "", extracted.isEmpty() ? footer : "\n" + footer));
     }
 
-    /// The folder named after the image without its extension, in the current directory
-    static Path defaultTarget(Path image) {
-        var fileName = image.getFileName().toString();
-        var dot = fileName.lastIndexOf('.');
-        return Path.of(dot > 0 ? fileName.substring(0, dot) : fileName);
+    /// Where extract writes without a target folder; the result is always a folder in the current directory named after the image
+    static Path defaultTarget(Path image) throws IOException {
+        return Extraction.defaultTarget(existing(image));
     }
 
     static Path existing(Path image) {
@@ -54,7 +52,7 @@ public interface Images {
     static String describe(Volume volume) {
         var files = volume.entries();
         var header = "\n%s  %s capacity, %d file(s), %s used".formatted(
-                volume.label(), human(volume.capacity()), files.size(), human(volume.used()));
+                volume.displayLabel(), human(volume.capacity()), files.size(), human(volume.used()));
         return files.stream()
                 .map(Images::describe)
                 .collect(Collectors.joining("", header, ""));

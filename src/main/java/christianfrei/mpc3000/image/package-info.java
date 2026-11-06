@@ -12,6 +12,7 @@
 /// - R1.3 — When an image is listed, the BC shall report every file with its full 16-character MPC name, its size and its MPC file type. _(why: the 8.3 part alone is ambiguous — `11042026B.PGM` and `11042026C.PGM` share it)_
 /// - R1.4 — If the image file does not exist, then the BC shall reject the request naming the file.
 /// - R1.5 — If the file holds neither a partition table with FAT partitions nor a FAT volume, then the BC shall reject the request as not an MPC3000 image.
+/// - R1.6 — When a partition without volume label is listed, the BC shall report it as `(no label)`. _(why: MPC3000 floppies carry no label)_
 ///
 /// ### R2: Extract an image
 /// - R2.1 — When an image is extracted, the BC shall write each partition containing sounds into its own folder named after the partition label, holding all files of that partition byte-identical to the image.
@@ -23,6 +24,7 @@
 /// - R2.7 — If a file name contains characters reserved on host file systems, then the BC shall replace each of them with `_`. _(why: the first character of an MPC name may be any symbol, e.g. `(OUND038`)_
 /// - R2.8 — If the target exists and is not a folder, then the BC shall reject the request.
 /// - R2.9 — If a file's cluster chain ends before its size is reached, then the BC shall reject the extraction naming the file.
+/// - R2.10 — When an unpartitioned floppy image without volume label is extracted, the BC shall write its files into a folder named after the image without its extension, inside the target folder or, without a target folder, in the current directory. _(why: several floppies extracted into one target must not overwrite each other)_
 ///
 /// ## Entities
 /// - Volume, PartitionEntry, BootSector, DirectoryEntry, Fat, FileType, ExtractedPartition

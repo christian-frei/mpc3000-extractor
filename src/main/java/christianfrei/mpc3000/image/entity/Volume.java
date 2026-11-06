@@ -23,8 +23,23 @@ public record Volume(String label, long offset, BootSector boot, List<DirectoryE
         return entries.stream().mapToLong(DirectoryEntry::size).sum();
     }
 
-    /// Partition label as folder name, numbered when the label is missing
-    public String folderName(int number) {
-        return label.isBlank() ? "PARTITION-%02d".formatted(number) : label;
+    /// A floppy is a single FAT volume at the very start of the image, without partition table
+    public boolean isFloppy() {
+        return offset == 0;
+    }
+
+    public boolean isLabeled() {
+        return !label.isBlank();
+    }
+
+    public String displayLabel() {
+        return isLabeled() ? label : "(no label)";
+    }
+
+    /// The label as folder name; an unlabeled floppy is named after its image, an unlabeled partition is numbered
+    public String folderName(int number, String imageName) {
+        if (isLabeled())
+            return label;
+        return isFloppy() ? imageName : "PARTITION-%02d".formatted(number);
     }
 }

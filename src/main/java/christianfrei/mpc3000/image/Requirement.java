@@ -25,6 +25,8 @@ public @interface Requirement {
         R1_4("R1.4", "If the image file does not exist, then the BC shall reject the request naming the file."),
         /// If the file holds neither a partition table with FAT partitions nor a FAT volume, then the BC shall reject the request as not an MPC3000 image.
         R1_5("R1.5", "If the file holds neither a partition table with FAT partitions nor a FAT volume, then the BC shall reject the request as not an MPC3000 image."),
+        /// When a partition without volume label is listed, the BC shall report it as `(no label)`.
+        R1_6("R1.6", "When a partition without volume label is listed, the BC shall report it as `(no label)`."),
         /// When an image is extracted, the BC shall write each partition containing sounds into its own folder named after the partition label, holding all files of that partition byte-identical to the image.
         R2_1("R2.1", "When an image is extracted, the BC shall write each partition containing sounds into its own folder named after the partition label, holding all files of that partition byte-identical to the image."),
         /// When an image is extracted, the BC shall skip partitions that contain no sounds.
@@ -42,7 +44,9 @@ public @interface Requirement {
         /// If the target exists and is not a folder, then the BC shall reject the request.
         R2_8("R2.8", "If the target exists and is not a folder, then the BC shall reject the request."),
         /// If a file's cluster chain ends before its size is reached, then the BC shall reject the extraction naming the file.
-        R2_9("R2.9", "If a file's cluster chain ends before its size is reached, then the BC shall reject the extraction naming the file.");
+        R2_9("R2.9", "If a file's cluster chain ends before its size is reached, then the BC shall reject the extraction naming the file."),
+        /// When an unpartitioned floppy image without volume label is extracted, the BC shall write its files into a folder named after the image without its extension, inside the target folder or, without a target folder, in the current directory.
+        R2_10("R2.10", "When an unpartitioned floppy image without volume label is extracted, the BC shall write its files into a folder named after the image without its extension, inside the target folder or, without a target folder, in the current directory.");
 
         private final String id;
         private final String statement;

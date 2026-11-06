@@ -25,7 +25,7 @@ public interface Extraction {
                 var volume = volumes.get(i);
                 if (!volume.hasSounds())
                     continue;
-                var folder = Files.createDirectories(target.resolve(HostNames.safe(volume.folderName(i + 1))));
+                var folder = Files.createDirectories(target.resolve(HostNames.safe(volume.folderName(i + 1, imageName(image)))));
                 var fat = new Fat(Sectors.read(channel, volume.offset() + volume.boot().fatOffset(), volume.boot().fatSize()));
                 var taken = new HashSet<String>();
                 for (var entry : volume.entries())
@@ -34,6 +34,21 @@ public interface Extraction {
             }
             return extracted;
         }
+    }
+
+    /// The image's file name without its extension
+    static String imageName(Path image) {
+        var fileName = image.getFileName().toString();
+        var dot = fileName.lastIndexOf('.');
+        return dot > 0 ? fileName.substring(0, dot) : fileName;
+    }
+
+    /// The folder partition folders go into when no target is given: the current directory for an unlabeled floppy,
+    /// which already gets a folder named after the image, otherwise a folder named after the image
+    static Path defaultTarget(Path image) throws IOException {
+        var volumes = Volumes.read(image);
+        var unlabeledFloppy = volumes.size() == 1 && volumes.getFirst().isFloppy() && !volumes.getFirst().isLabeled();
+        return unlabeledFloppy ? Path.of("") : Path.of(imageName(image));
     }
 
     static void extractFile(FileChannel channel, Volume volume, Fat fat, DirectoryEntry entry, Path file) throws IOException {
