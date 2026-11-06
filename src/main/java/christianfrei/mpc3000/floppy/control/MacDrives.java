@@ -20,6 +20,8 @@ import org.xml.sax.SAXException;
 public record MacDrives() implements Drives {
 
     static final String PROMPT = "mpc3000: administrator password for %u to read the floppy: ";
+    static final String WRITE_PROMPT = "mpc3000: administrator password for %u to write the floppy: ";
+    static final String EXIT = "exit ";
 
     @Override
     public List<Disk> externalDisks() throws IOException {
@@ -72,6 +74,65 @@ public record MacDrives() implements Drives {
         return output;
     }
 
+    @Override
+    public boolean isWriteProtected(Disk disk) throws IOException {
+        var result = run(List.of("diskutil", "info", "-plist", disk.identifier()));
+        if (result.exitCode() != 0)
+            throw new IOException("diskutil failed: " + result.output());
+        return isWriteProtected(result.output());
+    }
+
+    /// `WritableMedia` is false while the write-protect tab is open
+    public static boolean isWriteProtected(String plist) throws IOException {
+        var writable = value(rootDict(plist), "WritableMedia");
+        return writable != null && writable.getTagName().equals("false");
+    }
+
+    @Override
+    public boolean confirm(String question) throws IOException {
+        try (var terminal = new RandomAccessFile("/dev/tty", "rw")) {
+            terminal.write(question.getBytes(StandardCharsets.UTF_8));
+            var answer = terminal.readLine();
+            return answer != null && answer.strip().equalsIgnoreCase("y");
+        }
+    }
+
+    @Override
+    public void write(Disk disk, Path image, Path readBack) throws IOException {
+        var result = runInTerminal(writeCommand(disk, image, readBack, System.getProperty("user.name")));
+        if (result.exitCode() != 0)
+            throw new CancellationException("administrator password prompt cancelled or failed");
+        written(result.output());
+    }
+
+    public static List<String> writeCommand(Disk disk, Path image, Path readBack, String user) {
+        return List.of("sudo", "-p", WRITE_PROMPT, "/bin/sh", "-c", writeShellCommand(disk, image, readBack, user));
+    }
+
+    /// Unmounts the disk and writes image track by track; only after a successful write reads the disk back
+    /// sector by sector into readBack, owned by user; always ejects the disk and prints the output of unmount and
+    /// write followed by `exit <status>`
+    public static String writeShellCommand(Disk disk, Path image, Path readBack, String user) {
+        var device = quoted(disk.device());
+        var raw = quoted(disk.rawDevice());
+        var source = quoted(image.toAbsolutePath().normalize().toString());
+        var copy = quoted(readBack.toAbsolutePath().normalize().toString());
+        return ("out=$( { /usr/sbin/diskutil unmountDisk %s && /bin/dd if=%s of=%s bs=9216; } 2>&1 ); status=$?; "
+                + "if [ $status -eq 0 ]; then /bin/dd if=%s of=%s bs=512 conv=noerror,sync 2>/dev/null; /usr/sbin/chown %s %s; fi; "
+                + "/usr/sbin/diskutil eject %s >/dev/null 2>&1; echo \"$out\"; echo \"exit $status\"")
+                .formatted(device, source, raw, raw, copy, quoted(user), copy, device);
+    }
+
+    /// @throws IOException with the output of unmount and write when either failed
+    public static void written(String shellOutput) throws IOException {
+        var lines = shellOutput.strip().lines().toList();
+        var status = lines.isEmpty() ? "" : lines.getLast();
+        if (!status.equals(EXIT + 0)) {
+            var output = String.join("\n", lines.isEmpty() ? lines : lines.subList(0, lines.size() - 1));
+            throw new IOException("write failed (%s): %s".formatted(status, output.strip()));
+        }
+    }
+
     /// Single-quotes for the shell; an embedded quote becomes '\''
     static String quoted(String text) {
         return "'" + text.replace("'", "'\\''") + "'";
@@ -79,23 +140,35 @@ public record MacDrives() implements Drives {
 
     /// Reads `DeviceIdentifier` and `Size` of each whole disk from `diskutil list -plist` output
     public static List<Disk> disks(String plist) throws IOException {
+        var disks = new ArrayList<Disk>();
+        var wholeDisks = value(rootDict(plist), "AllDisksAndPartitions");
+        if (wholeDisks == null)
+            return disks;
+        for (var dict = firstElement(wholeDisks.getFirstChild()); dict != null; dict = firstElement(dict.getNextSibling())) {
+            var identifier = value(dict, "DeviceIdentifier");
+            var size = value(dict, "Size");
+            if (identifier != null && size != null)
+                disks.add(new Disk(identifier.getTextContent(), parseSize(size.getTextContent())));
+        }
+        return disks;
+    }
+
+    static long parseSize(String text) throws IOException {
+        try {
+            return Long.parseLong(text.strip());
+        } catch (NumberFormatException e) {
+            throw new IOException("cannot read diskutil output: " + e.getMessage(), e);
+        }
+    }
+
+    /// The top-level dict of a plist
+    static Element rootDict(String plist) throws IOException {
         try {
             var factory = DocumentBuilderFactory.newInstance();
             factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
             var document = factory.newDocumentBuilder().parse(new ByteArrayInputStream(plist.getBytes(StandardCharsets.UTF_8)));
-            var root = firstElement(document.getDocumentElement().getFirstChild());
-            var disks = new ArrayList<Disk>();
-            var wholeDisks = value(root, "AllDisksAndPartitions");
-            if (wholeDisks == null)
-                return disks;
-            for (var dict = firstElement(wholeDisks.getFirstChild()); dict != null; dict = firstElement(dict.getNextSibling())) {
-                var identifier = value(dict, "DeviceIdentifier");
-                var size = value(dict, "Size");
-                if (identifier != null && size != null)
-                    disks.add(new Disk(identifier.getTextContent(), Long.parseLong(size.getTextContent().strip())));
-            }
-            return disks;
-        } catch (ParserConfigurationException | SAXException | NumberFormatException e) {
+            return firstElement(document.getDocumentElement().getFirstChild());
+        } catch (ParserConfigurationException | SAXException e) {
             throw new IOException("cannot read diskutil output: " + e.getMessage(), e);
         }
     }

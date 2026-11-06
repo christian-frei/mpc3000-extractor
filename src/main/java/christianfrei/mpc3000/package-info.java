@@ -2,7 +2,7 @@
 /// > Read, extract, convert and restore the contents of AKAI MPC3000 disk images on a modern computer.
 ///
 /// ## Components
-/// - `image`, `sound` and `floppy` are independent; none calls another. `floppy-read` writes images that `list`/`extract` read; `extract` writes SND files that `convert` reads.
+/// - `image`, `sound` and `floppy` are independent; none calls another. `floppy-read` writes images that `list`/`extract` read, `floppy-write` copies images `restore` wrote onto a floppy; `extract` writes SND files that `convert` reads.
 ///
 /// ## Decisions
 /// - D1 — Multi-file `java-cli-app` built with zb, tested with zunit. _(why: sound conversion and image restore outgrow one file and need round-trip tests; rejected: single-file `java-cli-script`)_

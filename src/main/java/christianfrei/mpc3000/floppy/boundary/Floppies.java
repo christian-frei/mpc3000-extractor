@@ -8,6 +8,7 @@ import christianfrei.mpc3000.floppy.control.ImageFiles;
 import christianfrei.mpc3000.floppy.control.MacDrives;
 import christianfrei.mpc3000.floppy.entity.CopyReport;
 import christianfrei.mpc3000.floppy.entity.Disk;
+import christianfrei.mpc3000.floppy.entity.FloppyImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,7 +18,7 @@ import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-/// Copies the floppy in the USB drive into an image file; reports progress to output
+/// Copies floppies in the USB drive to and from image files; reports progress to output
 public interface Floppies {
 
     static void read(Optional<Path> image, Consumer<String> output) throws IOException {
@@ -50,6 +51,44 @@ public interface Floppies {
             throw new IOException("%d sector(s) could not be read and were filled with zeros".formatted(report.unreadableSectors()));
         if (!report.complete(disk))
             throw new IOException("incomplete image: %,d of %,d bytes".formatted(report.bytes(), disk.size()));
+    }
+
+    static void write(Path image, Consumer<String> output) throws IOException {
+        write(image, new MacDrives(), output);
+    }
+
+    /// @throws IOException when the disk could not be written or reads back differently
+    @Requirement({R2_1, R2_2, R2_3, R2_4, R2_5, R2_6, R2_7, R2_8, R2_9, R2_10, R2_11})
+    static void write(Path image, Drives drives, Consumer<String> output) throws IOException {
+        if (!Files.isRegularFile(image))
+            throw new IllegalArgumentException("image not found: " + image);
+        var disk = floppy(drives.externalDisks());
+        var floppyImage = new FloppyImage(Files.readAllBytes(image));
+        if (!floppyImage.fits(disk))
+            throw new IllegalArgumentException("%s has %,d bytes, the floppy in %s holds %,d".formatted(image, floppyImage.content().length, disk.identifier(), disk.size()));
+        if (!floppyImage.startsWithFatBootSector())
+            throw new IllegalArgumentException("not a floppy image, no FAT boot sector: " + image);
+        if (drives.isWriteProtected(disk))
+            throw new IllegalArgumentException("the floppy in %s is write-protected; close its write-protect hole".formatted(disk.identifier()));
+        if (!drives.canAskForPassword())
+            throw new IllegalArgumentException("run floppy-write in a terminal: it asks for confirmation and sudo for the administrator password there");
+        if (!drives.confirm("overwrite everything on the floppy in %s (%,d bytes) with %s? [y/N] ".formatted(disk.identifier(), disk.size(), image)))
+            throw new IllegalArgumentException("not confirmed, floppy left untouched");
+        output.accept("writing %s onto %s — enter your administrator password if asked".formatted(image, disk.rawDevice()));
+        var workspace = Files.createTempDirectory("mpc3000-");
+        var readBack = workspace.resolve("read-back.img");
+        try {
+            drives.write(disk, image, readBack);
+            var differing = floppyImage.differingSectors(Files.exists(readBack) ? Files.readAllBytes(readBack) : new byte[0]);
+            if (differing > 0)
+                throw new IOException("%d sector(s) read back differently; the floppy has been ejected, use another disk".formatted(differing));
+        } catch (CancellationException e) {
+            throw new IllegalArgumentException("password prompt cancelled or failed, floppy left untouched");
+        } finally {
+            Files.deleteIfExists(readBack);
+            Files.delete(workspace);
+        }
+        output.accept("wrote and verified %s on %s, %,d bytes; the floppy has been ejected".formatted(image, disk.identifier(), disk.size()));
     }
 
     static Disk floppy(List<Disk> disks) {

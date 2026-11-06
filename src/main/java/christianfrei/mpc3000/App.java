@@ -12,7 +12,7 @@ import java.util.Optional;
 public interface App {
 
     String NAME = "mpc3000";
-    String VERSION = "2026-11-06.6";
+    String VERSION = "2026-11-06.7";
 
     record Invocation(String command, List<String> parameters) {
 
@@ -67,6 +67,11 @@ public interface App {
                     throw new IllegalArgumentException("floppy-read expects an optional image file");
                 Floppies.read(parameters.stream().findFirst().map(Path::of), IO::println);
             }
+            case "floppy-write" -> {
+                if (parameters.size() != 1)
+                    throw new IllegalArgumentException("floppy-write expects exactly one image file");
+                Floppies.write(Path.of(parameters.getFirst()), IO::println);
+            }
             default -> throw new IllegalArgumentException("unknown command: " + invocation.command());
         }
     }
@@ -86,6 +91,8 @@ public interface App {
                                              by default <folder>.iso or .img next to the folder
                   floppy-read [<image>]      Copy the floppy in the USB drive into an image file,
                                              by default the next free ./FLOPPYnn.img
+                  floppy-write <image>       Copy a floppy image onto the floppy in the USB drive,
+                                             after asking; verifies it and ejects the disk
                   help                       Show this help (default)
                   version                    Show version""".formatted(NAME));
     }

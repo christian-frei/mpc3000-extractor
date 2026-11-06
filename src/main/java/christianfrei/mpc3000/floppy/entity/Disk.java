@@ -12,6 +12,11 @@ public record Disk(String identifier, long size) {
         return FLOPPY_SIZES.contains(size);
     }
 
+    /// The block device diskutil works on
+    public String device() {
+        return "/dev/" + identifier;
+    }
+
     /// The unbuffered character device, much faster than the block device
     public String rawDevice() {
         return "/dev/r" + identifier;

@@ -51,6 +51,21 @@ static class FakeDrives implements Drives {
             throw new CancellationException("cancelled");
         return output;
     }
+
+    @Override
+    public boolean isWriteProtected(Disk disk) {
+        throw new UnsupportedOperationException("reading never writes");
+    }
+
+    @Override
+    public boolean confirm(String question) {
+        throw new UnsupportedOperationException("reading asks nothing");
+    }
+
+    @Override
+    public void write(Disk disk, Path image, Path readBack) {
+        throw new UnsupportedOperationException("reading never writes");
+    }
 }
 
 void main() throws Exception {

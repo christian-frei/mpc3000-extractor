@@ -38,7 +38,29 @@ public @interface Requirement {
         /// If the disk cannot be copied at all, then the BC shall report the reason given by the copy tool and leave no image file behind.
         R1_11("R1.11", "If the disk cannot be copied at all, then the BC shall report the reason given by the copy tool and leave no image file behind."),
         /// If no terminal is available to ask for the administrator password, then the BC shall reject the request before copying and ask for it to be run in a terminal.
-        R1_12("R1.12", "If no terminal is available to ask for the administrator password, then the BC shall reject the request before copying and ask for it to be run in a terminal.");
+        R1_12("R1.12", "If no terminal is available to ask for the administrator password, then the BC shall reject the request before copying and ask for it to be run in a terminal."),
+        /// When an image is written to a floppy, the BC shall unmount the disk, copy every sector of the image onto it, read the disk back and report the write as verified when every sector matches the image.
+        R2_1("R2.1", "When an image is written to a floppy, the BC shall unmount the disk, copy every sector of the image onto it, read the disk back and report the write as verified when every sector matches the image."),
+        /// When the disk has been written, the BC shall eject it.
+        R2_2("R2.2", "When the disk has been written, the BC shall eject it."),
+        /// Before writing, the BC shall ask for confirmation naming the disk and the image, and shall leave the disk untouched unless the answer is `y`.
+        R2_3("R2.3", "Before writing, the BC shall ask for confirmation naming the disk and the image, and shall leave the disk untouched unless the answer is `y`."),
+        /// When exactly one external disk of floppy size is attached, the BC shall write to that disk, and reject the request otherwise as reading does.
+        R2_4("R2.4", "When exactly one external disk of floppy size is attached, the BC shall write to that disk, and reject the request otherwise as reading does."),
+        /// If the image file does not exist, then the BC shall reject the request naming the file.
+        R2_5("R2.5", "If the image file does not exist, then the BC shall reject the request naming the file."),
+        /// If the image's size differs from the disk's or the image does not start with a FAT boot sector, then the BC shall reject the request before writing.
+        R2_6("R2.6", "If the image's size differs from the disk's or the image does not start with a FAT boot sector, then the BC shall reject the request before writing."),
+        /// If the disk is write-protected, then the BC shall reject the request before writing and say so.
+        R2_7("R2.7", "If the disk is write-protected, then the BC shall reject the request before writing and say so."),
+        /// If sectors read back from the disk differ from the image, then the BC shall report the write as failed with the number of differing sectors.
+        R2_8("R2.8", "If sectors read back from the disk differ from the image, then the BC shall report the write as failed with the number of differing sectors."),
+        /// If the disk cannot be unmounted or written, then the BC shall report the reason given by the tool.
+        R2_9("R2.9", "If the disk cannot be unmounted or written, then the BC shall report the reason given by the tool."),
+        /// If the administrator password prompt is cancelled or fails, then the BC shall reject the request with the disk untouched.
+        R2_10("R2.10", "If the administrator password prompt is cancelled or fails, then the BC shall reject the request with the disk untouched."),
+        /// If no terminal is available to ask for confirmation and the administrator password, then the BC shall reject the request before writing.
+        R2_11("R2.11", "If no terminal is available to ask for confirmation and the administrator password, then the BC shall reject the request before writing.");
 
         private final String id;
         private final String statement;
