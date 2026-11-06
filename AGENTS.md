@@ -1,6 +1,6 @@
 # AKAI MPC3000 Suite
 
-A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: list, extract, convert sounds, and restore folders into new images. Built with the `/java-cli-app` skill (zb, zunit, BCE).
+A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: read and write floppies, list, extract, convert sounds, restore folders into new images, and format empty ones. Built with the `/java-cli-app` skill (zb, zunit, BCE).
 
 ## Commands
 
@@ -19,9 +19,18 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 2. `extract` — done
 3. `convert` — done (`sound` BC)
 3b. `floppy-read` — done (`floppy` BC, macOS only)
-4b. `floppy-write` — done (`floppy` BC R2, decision D3), not yet tried on the real drive
-4. `restore` — done (`image` BC R3, decision D2); round trip extract → restore → extract verified on HD0 and FLOPPY01
+4. `restore` — done (`image` BC R3, decision D2); round trip extract → restore → extract verified on HD0 and FLOPPY01, restored images work on the MPC3000
+4b. `floppy-write` — done (`floppy` BC R2, decision D3); a written floppy works on the MPC3000
+4c. `format` — done (`image` BC R4); formatted ZuluSCSI images HD1–HD6 work on the MPC3000
 5. later: `../zaudioconvert` reuses the `sound` BC from this project's JAR instead of duplicating the SND parser
+
+## Open items
+
+- **Partition size the MPC3000 writes:** both HD0 copies came from an unknown internet source and differ only in each partition boot sector's total sectors: 64,134 (A) / 64,197 in `src/test/resources/HD0.iso`, 60,087 in the SD card's `HD0.iso` (exactly what the 11-sector FAT addresses, 3,754 entries). `restore` and `format` write the repo's values, which the MPC3000 accepts. To settle it, format a partition on the MPC3000 itself and read its boot sector (offset 0x13)
+- **SND loop on/off flag:** not located; probably in header bytes 34–37. Every loop with a length is converted to a `smpl` loop. Naming sounds that do and don't loop on the MPC3000 would pin it down
+- **`../zaudioconvert`:** should reuse the `sound` BC from this project's JAR (roadmap 5)
+- **FLOPPY03.img:** an all-zero re-read of the disk FLOPPY01 came from (the disk or the drive was failing then); kept in `src/test/resources`, not used by tests
+- **ZuluSCSI:** `zuluerr.txt` on the SD card records one firmware crash (25.08.26-release) after about 5 hours with an empty command; not reproduced, no visible effect
 
 ## Structure and specs
 
@@ -62,5 +71,6 @@ A zero-dependency Java 25 CLI suite (`mpc3000`) for AKAI MPC3000 disk images: li
 ## Workflow
 
 - Test images: `src/test/resources/HD0.iso` (23 partitions, A–F hold 203 files), `src/test/resources/FLOPPY01.img` (15 files, 13 sounds)
+- The user's ZuluSCSI RP2040 SD card (FAT32, mounts as `NO NAME`) holds `HD0.iso`…`HD6.iso` for SCSI IDs 0–6; read it, and write to it only when asked
 - Never extract into the repo; use a temp folder; when trying `floppy-read`, pass `src/test/resources/<name>.img` (git-ignored) instead of defaulting to the repo root
 - Git: commit often using conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`)

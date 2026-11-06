@@ -1,6 +1,6 @@
 # mpc3000
 
-Copies MPC3000 floppies between a USB floppy drive and image files, lists and extracts the files on AKAI MPC3000 hard disk and floppy images, converts MPC3000 sounds to WAV, and writes host folders back into new images. A zero-dependency Java 25 CLI app.
+Moves AKAI MPC3000 data between the sampler and a Mac: copies floppies to and from image files, lists and extracts hard disk and floppy images (e.g. from a ZuluSCSI SD card), converts sounds to WAV, and writes host folders back into new images or formats empty ones. A zero-dependency Java 25 CLI app; the floppy commands need macOS.
 
 ## Prerequisites
 
@@ -31,7 +31,14 @@ mpc3000 format HD1.iso            # empty 23-partition hard disk, e.g. for a Zul
 mpc3000 format blank.img floppy   # empty 1.44 MB floppy
 ```
 
-`floppy-read` finds the floppy drive on its own and runs the copy with `sudo`, so start it in a terminal (iTerm, Terminal) — that terminal app needs access to removable volumes, which macOS asks for on first use; it never overwrites an image and fills unreadable sectors with zeros. `floppy-write` asks before it overwrites the disk, unmounts it, writes the image, reads it back to verify every sector and ejects the disk so macOS cannot write onto it again; the disk must be formatted for 1.44 MB already (by the MPC3000 or a computer), and the image must be a floppy image of that size. `extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files; an unlabeled floppy gets a folder named after the image. `convert` writes 16-bit mono 44.1 kHz WAVs holding the whole sample, with the MPC start point as a `cue` marker and the loop as a `smpl` loop; files it cannot read are listed and the exit code is 1. `restore` turns a folder of partition folders (`MPC-PART--A` … `MPC-PART--W`) into a hard disk image laid out like one the MPC3000 formatted, and a folder of files into a floppy image; it never overwrites an image, uppercases names, leaves out and lists files that are not MPC files, and ignores hidden files like `.DS_Store`. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
+- `floppy-read` finds the drive on its own and copies with `sudo`, so start it in a terminal app (iTerm, Terminal), which macOS asks to grant access to removable volumes on first use. Unreadable sectors are filled with zeros, counted and fail the command.
+- `floppy-write` asks before overwriting the disk, unmounts it, writes the image, reads every sector back and ejects the disk so macOS cannot write onto it again. The disk must already be formatted for 1.44 MB, by the MPC3000 or a computer.
+- `extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files; an unlabeled floppy gets a folder named after the image.
+- `convert` writes 16-bit mono 44.1 kHz WAVs holding the whole sample, with the start point as a `cue` marker and the loop as a `smpl` loop; unreadable files are listed and fail the command.
+- `restore` turns a folder of partition folders (`MPC-PART--A` … `MPC-PART--W`) into a hard disk image and a folder of files into a floppy image. It uppercases names, leaves out and lists files that are not MPC files, and ignores hidden files like `.DS_Store`.
+- `format` writes empty images. ZuluSCSI starts from blank image files, which the MPC3000 rejects until they are formatted.
+- `restore`, `format` and the image commands write the partition table, boot sectors and FATs byte for byte like the MPC3000 disk they were checked against; the MPC3000 loads the results.
+- No command overwrites an existing image. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
 
 ## Test
 
