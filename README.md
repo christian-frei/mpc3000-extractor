@@ -26,7 +26,7 @@ mpc3000 convert samples           # every SND below samples/ → WAV next to it
 mpc3000 convert samples wav       # mirrored into ./wav/
 ```
 
-`floppy-read` finds the floppy drive on its own and asks for your administrator password in the macOS dialog; it never overwrites an image and fills unreadable sectors with zeros. `extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files; an unlabeled floppy gets a folder named after the image. `convert` writes 16-bit mono 44.1 kHz WAVs holding the whole sample, with the MPC start point as a `cue` marker and the loop as a `smpl` loop; files it cannot read are listed and the exit code is 1. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
+`floppy-read` finds the floppy drive on its own and runs the copy with `sudo`, so start it in a terminal (iTerm, Terminal) — that terminal app needs access to removable volumes, which macOS asks for on first use; it never overwrites an image and fills unreadable sectors with zeros. `extract` writes one subfolder per partition that contains sounds (`SND`) and replaces existing files; an unlabeled floppy gets a folder named after the image. `convert` writes 16-bit mono 44.1 kHz WAVs holding the whole sample, with the MPC start point as a `cue` marker and the loop as a `smpl` loop; files it cannot read are listed and the exit code is 1. Run `mpc3000` without arguments or with `help` for usage, `version` for the version.
 
 ## Test
 
